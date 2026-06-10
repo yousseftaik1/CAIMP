@@ -1,0 +1,334 @@
+% ============================================================================
+% Chapitre 3 — Analyse et spécification des besoins
+% ============================================================================
+\chapter{Analyse et spécification des besoins}
+
+\section*{Introduction}
+
+Ce chapitre formalise les exigences du système \caimp{} en besoins fonctionnels
+et non fonctionnels, identifie les acteurs, et présente les modèles UML qui
+guident la phase de conception. La démarche d'analyse s'est appuyée sur l'étude
+comparative du chapitre précédent, complétée par des scénarios d'usage concrets.
+
+\section{Identification des acteurs}
+
+Le système \caimp{} implique quatre catégories d'acteurs :
+
+\begin{description}[leftmargin=2.5cm, style=nextline]
+  \item[\textbf{Administrateur}] Rôle le plus privilégié. Gère les organisations,
+    les utilisateurs, les serveurs, et configure la plateforme. Accède à l'\api{}
+    d'administration (port 8001).
+  \item[\textbf{Opérateur}] Utilisateur technique qui consulte les tableaux de
+    bord, gère les runbooks, configure les règles d'alerte, et interprète les
+    analyses \textsc{ai}. Rôle \texttt{devops} en base.
+  \item[\textbf{Viewer}] Lecture seule. Consulte les dashboards et les rapports
+    PDF. Rôle conçu pour les parties prenantes non techniques (managers, clients).
+  \item[\textbf{Agent système}] Acteur non humain. Le processus démon
+    \texttt{caimp-agent} s'exécute sur les serveurs surveillés. Il s'authentifie
+    par certificat mTLS et envoie les métriques via OTLP.
+\end{description}
+
+\section{Besoins fonctionnels}
+
+\begin{enumerate}[label=\textbf{BF\arabic*}, leftmargin=2.2cm, itemsep=4pt]
+  \item L'agent doit collecter les métriques CPU, mémoire et disque toutes les
+    15 secondes et les transmettre via OTLP/HTTP.
+  \item L'agent doit s'auto-inscrire auprès de la plateforme à l'aide d'un jeton
+    d'enrôlement à usage unique.
+  \item L'agent doit utiliser un certificat mTLS délivré par l'autorité de
+    certification interne pour authentifier chaque connexion.
+  \item L'agent doit détecter et reporter automatiquement les événements Docker
+    (démarrage, arrêt, tirage d'image).
+  \item L'agent doit surveiller les journaux d'installation de paquets (dpkg, yum)
+    et les événements SSH depuis les journaux d'authentification.
+  \item La plateforme doit détecter les anomalies en temps réel à l'aide d'au moins
+    trois algorithmes distincts (seuil, Z-score, taux de variation).
+  \item Les anomalies détectées doivent être publiées sur NATS JetStream pour
+    traitement asynchrone par les services consommateurs.
+  \item Le moteur d'analyse IA doit interroger la base vectorielle pour retrouver
+    des incidents similaires passés et les runbooks pertinents.
+  \item Le moteur d'analyse IA doit soumettre un prompt structuré à Ollama et
+    valider la réponse JSON avant persistance.
+  \item L'explication IA doit contenir : l'explication en langage naturel, la
+    cause racine probable, l'action recommandée, et le niveau de confiance.
+  \item Le moteur de corrélation doit interroger la table \texttt{change\_events}
+    dans la fenêtre de 30 minutes précédant chaque anomalie.
+  \item Le moteur de corrélation doit scorer chaque changement par proximité
+    temporelle et type, et produire un classement des causes probables.
+  \item Le moteur de prévision doit calculer les prévisions Holt-Winters sur
+    24 heures pour chaque combinaison serveur/métrique.
+  \item Le moteur de prévision doit calculer le \textit{time to critical} ---
+    le délai prévu avant dépassement de seuil à 90~\%.
+  \item La déduplication d'alertes doit supprimer les alertes identiques
+    (même serveur, même métrique, même détecteur) répétées dans les 15 minutes.
+  \item L'\api{} de requête doit exposer un endpoint \texttt{/dashboard/summary}
+    agrégant le statut global, les problèmes potentiels et les actions recommandées.
+  \item L'interface utilisateur doit présenter en première page le statut global,
+    les problèmes potentiels triés par criticité, et les actions recommandées
+    numérotées.
+  \item La plateforme doit permettre la gestion des runbooks (créer, modifier,
+    supprimer) avec ré-indexation automatique des embeddings.
+  \item Le module de rapports doit générer un rapport PDF multi-sections lisible
+    par des non-techniciens, avec logo de l'organisation.
+  \item L'interface doit proposer un chatbot SSE permettant de poser des questions
+    en langage naturel sur les incidents et les serveurs.
+  \item La plateforme doit recevoir les webhooks GitHub et GitLab pour les
+    événements de déploiement.
+  \item L'administrateur doit pouvoir configurer les canaux de notification
+    (Slack, PagerDuty) pour les alertes critiques.
+  \item Les mises à jour d'état doivent être poussées en temps réel vers les
+    navigateurs connectés via WebSocket.
+  \item La plateforme doit supporter l'isolation multi-tenant : les données d'une
+    organisation ne doivent jamais être accessibles par une autre.
+  \item La plateforme doit fournir un endpoint de santé (\texttt{/health}) pour
+    chaque service, utilisé par les healthchecks Docker.
+\end{enumerate}
+
+\section{Besoins non fonctionnels}
+
+\subsection{Performance}
+
+\begin{itemize}
+  \item \textbf{Latence d'ingestion :} Le Telemetry Writer doit traiter un batch
+    de métriques en moins de 50~ms en conditions normales.
+  \item \textbf{Throughput :} La plateforme doit supporter au moins 1~000 points
+    de métriques par seconde sur un déploiement standard.
+  \item \textbf{Temps de réponse API :} Les endpoints de lecture (GET) doivent
+    répondre en moins de 300~ms pour un volume de 50 serveurs.
+  \item \textbf{Latence IA :} Une explication complète doit être générée en moins
+    de 30 secondes (dépendant du modèle LLM et du matériel).
+\end{itemize}
+
+\subsection{Sécurité}
+
+\begin{itemize}
+  \item Authentification de chaque agent par certificat mTLS (TLS 1.3) ;
+  \item Tokens d'enrôlement à usage unique, expirés après 30 minutes ;
+  \item Jetons JWT HS256 avec expiration courte (15 minutes) pour les \api{} ;
+  \item Isolation des données par organisation via RLS PostgreSQL ;
+  \item Chiffrement AES-256-GCM des secrets Splunk en base de données ;
+  \item Journalisation immuable de toutes les actions administratives (\texttt{audit\_log}).
+\end{itemize}
+
+\subsection{Disponibilité et résilience}
+
+\begin{itemize}
+  \item Objectif de disponibilité : 99,5~\% (temps d'arrêt maximum de 3h38/mois) ;
+  \item Healthchecks Docker sur chaque service avec politique de redémarrage
+    \texttt{unless-stopped} ;
+  \item Buffering local de l'agent sur SQLite en cas d'indisponibilité temporaire
+    de la plateforme ;
+  \item Messages NATS JetStream persistés sur disque (durabilité garantie).
+\end{itemize}
+
+\subsection{Maintenabilité}
+
+\begin{itemize}
+  \item Chaque service est autonome, déployable et testable indépendamment ;
+  \item Migrations de base de données versionnées avec \texttt{golang-migrate} ;
+  \item Conventions de commit standardisées (\textit{Conventional Commits}) ;
+  \item Documentation inline pour les fonctions publiques.
+\end{itemize}
+
+\section{Diagramme de cas d'utilisation global}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  actor/.style={draw=NavyBlue, fill=NavyBlue!10, rounded corners=3pt,
+    minimum width=1.8cm, minimum height=0.7cm, font=\small\bfseries},
+  uc/.style={draw=TealBlue, fill=TealBlue!8, ellipse,
+    minimum width=3.4cm, minimum height=0.9cm, font=\small, align=center},
+  sysbox/.style={draw=NavyBlue!50, dashed, rounded corners=6pt, fill=NavyBlue!3}
+]
+
+% Système CAIMP
+\node[sysbox, minimum width=13cm, minimum height=11cm] (sys) at (5.5,0) {};
+\node[above, font=\small\bfseries\color{NavyBlue}] at (sys.north) {Système CAIMP};
+
+% Acteurs gauche
+\node[actor] (admin)  at (-1.2, 3.0)   {Admin};
+\node[actor] (ops)    at (-1.2, 0.5)   {Opérateur};
+\node[actor] (viewer) at (-1.2,-2.0)   {Viewer};
+\node[actor] (agent)  at (12.5, 0.5)   {Agent};
+
+% Cas d'utilisation
+\node[uc] (login)     at (3.0, 4.5)    {S'authentifier};
+\node[uc] (usrmgr)    at (7.0, 4.5)    {Gérer utilisateurs};
+\node[uc] (srvmgr)    at (7.0, 3.0)    {Gérer serveurs};
+\node[uc] (dash)      at (3.0, 1.8)    {Consulter\\dashboard};
+\node[uc] (alerts)    at (7.0, 1.8)    {Voir alertes\\en temps réel};
+\node[uc] (runbooks)  at (3.0, 0.2)    {Gérer runbooks};
+\node[uc] (chat)      at (7.0, 0.2)    {Utiliser le chat IA};
+\node[uc] (report)    at (3.0,-1.4)    {Exporter rapport\\PDF};
+\node[uc] (forecast)  at (7.0,-1.4)    {Voir prévisions};
+\node[uc] (metrics)   at (5.0,-3.0)    {Envoyer métriques\\(OTLP)};
+\node[uc] (enroll)    at (9.0,-3.0)    {S'enrôler (mTLS)};
+
+% Flèches acteurs → UC
+\draw[->, NavyBlue] (admin)  -- (login);
+\draw[->, NavyBlue] (admin)  -- (usrmgr);
+\draw[->, NavyBlue] (admin)  -- (srvmgr);
+\draw[->, NavyBlue] (ops)    -- (login);
+\draw[->, NavyBlue] (ops)    -- (dash);
+\draw[->, NavyBlue] (ops)    -- (alerts);
+\draw[->, NavyBlue] (ops)    -- (runbooks);
+\draw[->, NavyBlue] (ops)    -- (chat);
+\draw[->, NavyBlue] (ops)    -- (forecast);
+\draw[->, NavyBlue] (viewer) -- (login);
+\draw[->, NavyBlue] (viewer) -- (dash);
+\draw[->, NavyBlue] (viewer) -- (report);
+\draw[->, NavyBlue] (agent)  -- (metrics);
+\draw[->, NavyBlue] (agent)  -- (enroll);
+
+\end{tikzpicture}
+\caption{Diagramme de cas d'utilisation global de \caimp{}}
+\label{fig:ucd-global}
+\end{figure}
+
+\section{Diagrammes de séquence}
+
+\subsection{Enrôlement d'un agent}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  lifeline/.style={draw=NavyBlue!50, dashed, thick},
+  actor/.style={draw=NavyBlue, fill=NavyBlue!15, minimum width=2.2cm,
+    minimum height=0.6cm, font=\footnotesize\bfseries, align=center},
+  msg/.style={->, draw=TealBlue, thick},
+  retmsg/.style={->, draw=DarkGray, dashed},
+  note/.style={draw=AccentOrange!60, fill=AccentOrange!10,
+    font=\tiny, align=center, rounded corners=3pt}
+]
+\def\dt{0.9}
+
+% Acteurs
+\node[actor] (admin) at (0,0)    {Admin\\(Browser)};
+\node[actor] (adm)   at (3.5,0)  {Admin API\\:8001};
+\node[actor] (db)    at (7.0,0)  {PostgreSQL};
+\node[actor] (agt)   at (10.5,0) {Agent\\(cible)};
+
+% Lignes de vie
+\draw[lifeline] (admin.south) -- ++(0,-10.5);
+\draw[lifeline] (adm.south)   -- ++(0,-10.5);
+\draw[lifeline] (db.south)    -- ++(0,-10.5);
+\draw[lifeline] (agt.south)   -- ++(0,-10.5);
+
+% Séquence
+\draw[msg] ($(admin.south)+(0,-0.5)$) -- node[above,font=\tiny]{POST /servers/enroll}
+  ($(adm.south)+(0,-0.5)$);
+\draw[msg] ($(adm.south)+(0,-1.2)$) -- node[above,font=\tiny]{INSERT enrollment\_token}
+  ($(db.south)+(0,-1.2)$);
+\draw[retmsg] ($(db.south)+(0,-2.0)$) -- node[above,font=\tiny]{token, server\_id}
+  ($(adm.south)+(0,-2.0)$);
+\draw[retmsg] ($(adm.south)+(0,-2.8)$) -- node[above,font=\tiny]{\{enrollment\_token\}}
+  ($(admin.south)+(0,-2.8)$);
+
+\node[font=\small\bfseries\color{TealBlue}] at (5.5,-3.5) {— L'admin copie le token sur le serveur cible —};
+
+\draw[msg] ($(agt.south)+(0,-4.2)$) -- node[below,font=\tiny]{python main.py --enroll TOKEN}
+  ++(0,0);
+\draw[msg] ($(agt.south)+(0,-4.8)$) -- node[above,font=\tiny]{POST /servers/\{id\}/enroll + token}
+  ($(adm.south)+(0,-4.8)$) node[below left, note]{Vérifie token\\+ expiry};
+\draw[msg] ($(adm.south)+(0,-5.8)$) -- node[above,font=\tiny]{Génère cert mTLS (ECDSA P-256)}
+  ($(db.south)+(0,-5.8)$);
+\draw[retmsg] ($(db.south)+(0,-6.6)$) -- node[above,font=\tiny]{cert\_pem, ca\_cert}
+  ($(adm.south)+(0,-6.6)$);
+\draw[retmsg] ($(adm.south)+(0,-7.4)$) -- node[above,font=\tiny]{\{cert, key, ca\_cert, server\_id\}}
+  ($(agt.south)+(0,-7.4)$);
+\draw[msg] ($(agt.south)+(0,-8.2)$) -- node[above,font=\tiny]{Sauvegarde cert local, démarre OTLP}
+  ++(0,0);
+
+\node[font=\footnotesize\bfseries\color{SuccessGreen}] at (5.5,-9.0)
+  {Agent enrôlé — métriques commencent à arriver};
+\end{tikzpicture}
+\caption{Séquence d'enrôlement d'un agent de supervision}
+\label{fig:seq-enrollment}
+\end{figure}
+
+\subsection{Détection d'anomalie et explication IA}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  lifeline/.style={draw=NavyBlue!50, dashed, thick},
+  actor/.style={draw=NavyBlue, fill=NavyBlue!15, minimum width=2cm,
+    minimum height=0.6cm, font=\tiny\bfseries, align=center},
+  msg/.style={->, draw=TealBlue, thick, font=\tiny},
+  retmsg/.style={->, draw=DarkGray, dashed, font=\tiny}
+]
+\node[actor] (agt)  at (0,0)    {Agent};
+\node[actor] (tw)   at (2.5,0)  {Telemetry\\Writer};
+\node[actor] (nats) at (5.0,0)  {NATS};
+\node[actor] (ai)   at (7.5,0)  {AI Worker};
+\node[actor] (oll)  at (10.0,0) {Ollama};
+\node[actor] (ws)   at (12.5,0) {WS Gwy};
+
+\foreach \x in {agt,tw,nats,ai,oll,ws}
+  \draw[lifeline] (\x.south) -- ++(0,-9.5);
+
+\draw[msg] ($(agt.south)+(0,-0.6)$) -- node[above]{OTLP batch métriques}
+  ($(tw.south)+(0,-0.6)$);
+\draw[msg] ($(tw.south)+(0,-1.3)$) -- node[above]{INSERT metrics (batch)}
+  ($(nats.south)+(0,-1.3)$) node[right,font=\tiny,color=DarkGray]{TimescaleDB};
+\draw[msg] ($(tw.south)+(0,-2.1)$) -- node[above]{Detect() → anomaly}
+  ($(nats.south)+(0,-2.1)$);
+\draw[msg] ($(nats.south)+(0,-2.9)$) -- node[above]{anomaly.detected.*}
+  ($(ai.south)+(0,-2.9)$);
+\draw[msg] ($(ai.south)+(0,-3.7)$) -- node[above]{SELECT history + RAG}
+  ($(oll.south)+(0,-3.7)$) node[right,font=\tiny,color=DarkGray]{PostgreSQL};
+\draw[msg] ($(ai.south)+(0,-4.5)$) -- node[above]{POST /api/generate (prompt)}
+  ($(oll.south)+(0,-4.5)$);
+\draw[retmsg] ($(oll.south)+(0,-5.3)$) -- node[above]{\{explication, cause, action\}}
+  ($(ai.south)+(0,-5.3)$);
+\draw[msg] ($(ai.south)+(0,-6.1)$) -- node[above]{INSERT ai\_explanations}
+  ($(nats.south)+(0,-6.1)$) node[right,font=\tiny,color=DarkGray]{PostgreSQL};
+\draw[msg] ($(ai.south)+(0,-6.9)$) -- node[above]{ai.explanation.ready.*}
+  ($(nats.south)+(0,-6.9)$);
+\draw[msg] ($(nats.south)+(0,-7.7)$) -- node[above]{fan-out}
+  ($(ws.south)+(0,-7.7)$);
+\draw[msg] ($(ws.south)+(0,-8.5)$) -- node[above]{WebSocket push → Browser}
+  ++(0,0);
+\end{tikzpicture}
+\caption{Séquence de détection d'anomalie et génération d'explication IA}
+\label{fig:seq-anomaly}
+\end{figure}
+
+\section{Matrice de traçabilité des besoins}
+
+\begin{table}[H]
+\centering
+\caption{Extrait de la matrice de traçabilité besoins fonctionnels -- composants}
+\label{tab:tracabilite}
+\small
+\begin{tabularx}{\textwidth}{lXll}
+\toprule
+\textbf{BF} & \textbf{Besoin} & \textbf{Composant} & \textbf{Module} \\
+\midrule
+BF1  & Collecte métriques OTLP        & \servicename{caimp-agent}      & \texttt{collectors.py} \\
+BF2  & Enrôlement par jeton            & \servicename{admin-api}        & \texttt{enrollment.py} \\
+BF3  & mTLS agent                      & \servicename{otelcol / tw}     & Config mTLS \\
+BF6  & Détection anomalies (3 algos)   & \servicename{telemetry-writer} & \texttt{detector.go} \\
+BF7  & Publication NATS                & \servicename{telemetry-writer} & \texttt{publisher.go} \\
+BF8--BF10 & Explication IA            & \servicename{ai-worker}        & \texttt{prompt\_builder.py} \\
+BF11--BF12 & Corrélation changements  & \servicename{correlation-engine} & \texttt{main.py} \\
+BF13--BF14 & Prévision Holt-Winters   & \servicename{forecast-engine}  & \texttt{forecaster.py} \\
+BF15 & Déduplication alertes           & \servicename{alert-engine}     & \texttt{worker.py} \\
+BF16--BF17 & Dashboard answers-first  & \servicename{query-api}        & \texttt{dashboard.py} \\
+BF18 & Gestion runbooks + RAG          & \servicename{query-api}        & \texttt{incidents.py} \\
+BF19 & Rapport PDF                     & \servicename{query-api}        & \texttt{reports.py} \\
+BF21 & Webhooks GitHub/GitLab          & \servicename{change-tracker}   & \texttt{main.py} \\
+BF23 & WebSocket push                  & \servicename{ws-gateway}       & \texttt{main.py} \\
+BF24 & Isolation multi-tenant          & PostgreSQL                     & Migrations RLS \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Conclusion}
+
+L'analyse des besoins a permis d'identifier 25 besoins fonctionnels couvrant
+la totalité du périmètre de \caimp{}, et de formaliser les exigences non
+fonctionnelles en matière de performance, sécurité, disponibilité et
+maintenabilité. Les diagrammes UML présentés constituent le contrat entre
+l'analyse et la conception qui fait l'objet du chapitre suivant.

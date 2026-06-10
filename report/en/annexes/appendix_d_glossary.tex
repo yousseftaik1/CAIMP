@@ -1,0 +1,124 @@
+\chapter{Technical Glossary}
+
+\begin{description}[leftmargin=3.5cm, style=nextline, font=\bfseries\color{NavyBlue}]
+
+  \item[AIOps]
+    Artificial Intelligence for IT Operations. Application of machine learning
+    and AI techniques to IT operations, notably for anomaly detection, event
+    correlation and automatic recommendation generation.
+
+  \item[Alert fatigue]
+    Psychological phenomenon by which operators end up ignoring alerts due to
+    their excessive volume or a high rate of false positives.
+
+  \item[Asyncio]
+    Python standard library for asynchronous programming using coroutines
+    (async/await) and an event loop, enabling concurrent handling of many
+    network connections without OS threads.
+
+  \item[Chunk]
+    In TimescaleDB, the physical storage unit corresponding to a time partition
+    of the hypertable. Old chunks are automatically compressed.
+
+  \item[Embedding]
+    Dense vector representation of text in a high-dimensional space.
+    Semantically similar texts produce vectors close under cosine distance.
+    Used in \caimp{} for runbook and incident similarity search.
+
+  \item[GGUF]
+    File format for quantised language models used by Ollama and llama.cpp.
+
+  \item[Goroutine]
+    Lightweight execution thread in Go, managed by the Go runtime rather than
+    the OS. Thousands can run concurrently with minimal memory overhead.
+
+  \item[Healthcheck]
+    In Docker, a command executed periodically to verify a service is
+    operational. Failed healthchecks trigger container restart policies.
+
+  \item[HNSW]
+    Hierarchical Navigable Small World. Approximate nearest-neighbour search
+    algorithm for high-dimensional vector spaces. $O(\log n)$ search complexity.
+
+  \item[Holt-Winters]
+    Double exponential smoothing algorithm (level + trend) for forecasting
+    linear-trend time series. Designed by Charles Holt (1957) and
+    Peter Winters (1960).
+
+  \item[Hypertable]
+    TimescaleDB extension of a PostgreSQL table that automatically partitions
+    data by time intervals, enabling very high time-series insert and query
+    performance.
+
+  \item[JWT]
+    JSON Web Token. RFC 7519 standard for representing claims between two
+    parties as signed (JWS) or encrypted (JWE) JSON. Used in \caimp{} for
+    API request authentication.
+
+  \item[LLM]
+    Large Language Model. A neural network model trained on large amounts of
+    text to generate or complete natural-language text.
+
+  \item[mTLS]
+    Mutual Transport Layer Security. Extension of TLS in which both parties
+    (client and server) mutually authenticate by digital certificate. Used in
+    \caimp{} to authenticate monitoring agents.
+
+  \item[NATS JetStream]
+    Persistent extension of the NATS messaging system, offering at-least-once
+    delivery guarantees, durable consumers and disk-based message storage.
+
+  \item[Ollama]
+    Local LLM inference server exposing a REST API. Supports GGUF quantised
+    models and enables execution on standard hardware without GPU.
+
+  \item[OTLP]
+    OpenTelemetry Protocol. CNCF-standardised protocol for transmitting metrics,
+    traces and logs between instrumentation agents and observability backends.
+
+  \item[pgvector]
+    PostgreSQL extension adding the \texttt{VECTOR(n)} data type and similarity
+    operators (cosine, dot product, L2 distance) for nearest-neighbour search
+    directly within PostgreSQL.
+
+  \item[Q4\_K\_M]
+    4-bit K-means quantisation scheme. Reduces model size by approximately 75\%
+    compared to fp16 with less than 2\% quality degradation on reasoning benchmarks.
+
+  \item[RAG]
+    Retrieval-Augmented Generation. Technique that improves LLM response quality
+    by dynamically retrieving relevant documents from a knowledge base and
+    injecting them into the prompt.
+
+  \item[RLS]
+    Row-Level Security. PostgreSQL feature for defining per-row access control
+    policies. Used in \caimp{} for multi-tenant data isolation.
+
+  \item[SSE]
+    Server-Sent Events. Unidirectional HTTP protocol enabling the server to
+    push a continuous data stream to the client. Used in \caimp{} for AI
+    chat response streaming.
+
+  \item[Time to critical]
+    In \caimp{}, the predicted number of hours before a metric exceeds the
+    90\% threshold, computed by interpolation over Holt-Winters forecast points.
+
+  \item[TimescaleDB]
+    PostgreSQL extension transforming a relational database into a
+    high-performance time-series database with automatic partitioning,
+    columnar compression and retention policies.
+
+  \item[VPS]
+    Virtual Private Server. An isolated virtual server hosted in a third-party
+    datacenter.
+
+  \item[WebSocket]
+    Full-duplex bidirectional persistent TCP communication protocol (RFC 6455).
+    Used in \caimp{} to push real-time events to connected browsers.
+
+  \item[Z-score]
+    Statistical measure expressing how many standard deviations an observation
+    is from the mean: $z = (x - \mu) / \sigma$. Values $|z| > 3$ are
+    considered statistically anomalous in a normal distribution.
+
+\end{description}

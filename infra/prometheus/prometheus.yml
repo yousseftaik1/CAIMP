@@ -1,0 +1,87 @@
+# =============================================================================
+# CAIMP v2 — Prometheus scrape configuration
+# =============================================================================
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'caimp'
+
+# ---------------------------------------------------------------------------
+# Alerting (wire up to Alertmanager if added later)
+# ---------------------------------------------------------------------------
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# ---------------------------------------------------------------------------
+# Scrape jobs
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # OpenTelemetry Collector — self-metrics (Go runtime + pipeline throughput)
+  - job_name: 'otelcol'
+    static_configs:
+      - targets: ['otelcol:8888']
+    metric_relabel_configs:
+      # Drop high-cardinality histogram buckets we don't care about
+      - source_labels: [__name__]
+        regex: 'otelcol_process_cpu_seconds|otelcol_process_memory_rss|otelcol_receiver_.*|otelcol_exporter_.*|otelcol_processor_.*'
+        action: keep
+
+  # Telemetry Writer — Go runtime + ingestion/anomaly metrics
+  - job_name: 'telemetry-writer'
+    static_configs:
+      - targets: ['telemetry-writer:9091']
+
+  # AI Worker — Python runtime + Ollama processing metrics
+  - job_name: 'ai-worker'
+    static_configs:
+      - targets: ['ai-worker:9092']
+
+  # Alert Engine — Python runtime + rule evaluation metrics
+  - job_name: 'alert-engine'
+    static_configs:
+      - targets: ['alert-engine:9093']
+
+  # Admin API — FastAPI request metrics (via prometheus_fastapi_instrumentator)
+  - job_name: 'admin-api'
+    static_configs:
+      - targets: ['admin-api:8001']
+    metrics_path: '/metrics'
+
+  # Query API — FastAPI request metrics
+  - job_name: 'query-api'
+    static_configs:
+      - targets: ['query-api:8002']
+    metrics_path: '/metrics'
+
+  # WS Gateway — FastAPI + connection count metrics
+  - job_name: 'ws-gateway'
+    static_configs:
+      - targets: ['ws-gateway:8080']
+    metrics_path: '/metrics'
+
+  # Nginx — stub_status (basic connection stats; requires stub_status module)
+  # Enabled via separate nginx-prometheus-exporter sidecar if needed.
+  # Uncomment and deploy nginx-exporter to use:
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
+
+  # PostgreSQL exporter (deploy postgres_exporter separately for DB metrics)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Redis exporter (deploy redis_exporter separately for Redis metrics)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']

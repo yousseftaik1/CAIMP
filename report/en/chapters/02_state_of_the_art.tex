@@ -1,0 +1,156 @@
+\chapter{State of the Art}
+
+\section*{Introduction}
+
+This chapter examines existing monitoring solutions, available anomaly detection
+techniques, and recent advances in language models applied to IT operations.
+This comparative analysis is essential to justify the architectural choices of
+\caimp{} and demonstrate the added value of the adopted approach.
+
+\section{Commercial Monitoring Solutions}
+
+\subsection{Datadog}
+
+Datadog is a SaaS monitoring platform founded in 2010, with over 27,000 clients
+in 2023. Its \textit{Watchdog} AI feature provides automatic anomaly detection,
+but explanations remain superficial and do not leverage a generative LLM.
+Pricing: \$15--31/host/month; no on-premise deployment available.
+
+\subsection{Grafana + Prometheus}
+
+The Grafana/Prometheus combination has become the open source observability
+standard. Prometheus uses a pull-based model with its own TSDB and PromQL query
+language. Grafana provides visualisation across dozens of data sources. Both are
+entirely open source, but have \textbf{no native AI} and require significant
+expertise to configure. Alert fatigue is common without intelligent deduplication.
+
+\subsection{Dynatrace}
+
+Dynatrace features the Davis AI engine, a causal analysis system that
+automatically correlates anomalies across the full application stack. The most
+advanced root cause analysis on the market, but at \$69/host/month and with no
+open-source or on-premise option.
+
+\subsection{Splunk + ITSI}
+
+Splunk Enterprise with ITSI \cite{splunk_itsi} adds MLTK-based anomaly detection
+and event correlation. \caimp{} provides optional integration with Splunk as a
+secondary metric source. Already-equipped organisations can leverage \caimp{}'s
+explainability layer on top of Splunk's detection.
+
+\subsection{Open Source Alternatives}
+
+SigNoz (built on ClickHouse), Netdata (real-time single-host), Zabbix (mature
+but steep learning curve), and Nagios (static threshold pioneer, now outdated)
+all lack native AI explanation capabilities.
+
+\section{Comparative Table}
+
+\begin{table}[H]
+\centering
+\caption{Comparison of monitoring solutions across 12 criteria}
+\label{tab:comparison}
+\small
+\begin{tabularx}{\textwidth}{lXXXXXX}
+\toprule
+\textbf{Criterion} & \textbf{Datadog} & \textbf{Grafana/Prom.} & \textbf{Dynatrace}
+  & \textbf{SigNoz} & \textbf{Zabbix} & \textbf{\caimp{}} \\
+\midrule
+Price/host/mo  & \$15--31    & Free       & \$69     & Free        & Free       & Free \\
+On-premise     & No          & Yes        & No       & Yes         & Yes        & Yes \\
+Native AI      & Partial     & No         & Advanced & No          & No         & Yes \\
+LLM explanation& No          & No         & No       & No          & No         & \textbf{Yes} \\
+RAG + runbooks & No          & No         & No       & No          & No         & \textbf{Yes} \\
+Change corr.   & No          & No         & Partial  & No          & No         & \textbf{Yes} \\
+24h forecast   & Yes         & No         & Yes      & No          & No         & Yes \\
+Alert dedup.   & Yes         & Via AM     & Yes      & Partial     & No         & Yes \\
+Multi-tenant   & Yes         & Limited    & Yes      & Yes         & Yes        & Yes \\
+Deploy $<$10m  & No          & No         & No       & No          & No         & \textbf{Yes} \\
+Answers-first  & No          & No         & Partial  & No          & No         & \textbf{Yes} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Anomaly Detection Techniques}
+
+\subsection{Static Threshold}
+
+The simplest method: alert when a value exceeds a predefined threshold.
+Fast and deterministic, but prone to false positives on variable-load systems.
+Implemented in \caimp{} as a first rapid filter.
+
+\subsection{Z-Score Statistical Detection}
+
+The Z-score measures how many standard deviations a reading is from the
+historical mean (Equation~\ref{eq:zscore}):
+\begin{equation}
+  z = \frac{x - \mu}{\sigma}
+  \label{eq:zscore}
+\end{equation}
+A value $|z| > 3$ is considered anomalous. This method adapts automatically
+to the system's normal behaviour.
+
+\subsection{Rate of Change}
+
+The discrete derivative of the time series:
+\begin{equation}
+  \Delta_t = \frac{x_t - x_{t-1}}{x_{t-1}} \times 100\%
+\end{equation}
+Particularly effective for detecting rapid saturations that Z-score on a long
+window might miss.
+
+\subsection{Holt-Winters Double Exponential Smoothing}
+
+\cite{holt1957forecasting,winters1960forecasting}:
+\begin{align}
+  L_t &= \alpha x_t + (1-\alpha)(L_{t-1} + T_{t-1}) \\
+  T_t &= \beta(L_t - L_{t-1}) + (1-\beta)T_{t-1} \\
+  \hat{x}_{t+h} &= L_t + h \cdot T_t
+\end{align}
+Parameters used in \caimp{}: $\alpha = 0.3$, $\beta = 0.1$.
+Confidence intervals: $\pm 1.28\sigma$ residuals ($\approx$80\% coverage).
+
+\section{Language Models for AIOps}
+
+\subsection{Open LLM Landscape}
+
+\textbf{Llama 3.1 8B} \cite{llama3_meta2024} was selected for \caimp{} for its
+excellent quality/performance ratio in Q4\_K\_M quantised format: 4.7\,GB,
+inference latency under 2 seconds on standard hardware. Alternatives evaluated:
+Mistral 7B (slightly larger context window), Phi-3 Mini (excellent on constrained
+hardware), Gemma 7B (less well-aligned for operational tasks).
+
+\subsection{Quantisation}
+
+Q4\_K\_M quantisation \cite{dettmers2022quantization} reduces Llama 3.1 8B from
+16\,GB (fp16) to 4.7\,GB with less than 2\% quality degradation on reasoning
+benchmarks, making local LLM inference feasible on standard server hardware.
+
+\subsection{RAG Pattern}
+
+The Retrieval-Augmented Generation pattern \cite{lewis2020rag}:
+\begin{enumerate}
+  \item \textbf{Indexing}: documents (runbooks, past incidents) are embedded via
+    \texttt{nomic-embed-text} and stored in pgvector \cite{pgvector2021}.
+  \item \textbf{Retrieval}: at incident time, a query embedding is computed and
+    the $k$ most similar documents are retrieved via HNSW cosine similarity search.
+  \item \textbf{Augmentation}: retrieved documents are injected into the LLM
+    prompt as context before generation.
+\end{enumerate}
+
+\section{Positioning of CAIMP}
+
+The state of the art reveals a gap between expensive commercial AIOps solutions
+(Datadog, Dynatrace) and open source tools without AI (Grafana/Prometheus).
+\caimp{} occupies this space with four key differentiators: natural-language
+explanation via a local LLM; automatic change correlation (absent from all
+compared open source solutions); a lightweight modern event-driven architecture;
+and ten-minute deployment on any machine.
+
+\section*{Conclusion}
+
+The state of the art shows that while monitoring tools are plentiful, none
+simultaneously combines self-hosting, accessibility for non-experts, and natural
+language explanation via a local LLM. This gap fully justifies the creation of
+\caimp{}. The following chapter translates these findings into concrete functional
+and non-functional specifications.

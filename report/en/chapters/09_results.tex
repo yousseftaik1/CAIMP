@@ -1,0 +1,125 @@
+\chapter{Results, Discussion and Perspectives}
+
+\section*{Introduction}
+
+This chapter compares the results obtained against the initial objectives, analyses
+the platform's strengths and limitations objectively, and describes the evolution
+perspectives identified during development.
+
+\section{Results Obtained}
+
+\begin{table}[H]
+\centering
+\caption{Objectives vs.\ results matrix}
+\label{tab:obj-results}
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Objective} & \textbf{Result} & \textbf{Status} \\
+\midrule
+O1: Answers-first dashboard
+  & Status banner, issues, recommended actions
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O2: Change correlation
+  & Full engine: temporal scoring + LLM narrative
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O3: Local LLM explanation
+  & Ollama + Llama 3.1 8B, non-DevOps prompts
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O4: Holt-Winters 24h forecast
+  & 24 points, time-to-critical, LLM narrative
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O5: Microservices architecture
+  & 19 services, NATS JetStream, 8 streams
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O6: End-to-end security
+  & mTLS, JWT, RLS, AES-256-GCM, audit log
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+O7: Deployment $\leq$10 min
+  & 6 steps, $\approx$8 min (excl.\ model download)
+  & \textcolor{SuccessGreen}{\textbf{OK}} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Codebase Metrics}
+
+\begin{table}[H]
+\centering
+\caption{Quantitative codebase indicators}
+\label{tab:codebase-metrics}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Indicator} & \textbf{Value} \\
+\midrule
+Total lines of code (excl. tests and comments) & $\sim$52,000 \\
+Python services   & 11 \\
+Go services       & 1 (telemetry-writer) \\
+React/TypeScript components & 26 components, 6 pages \\
+SQL migrations    & 14 \\
+PostgreSQL tables & 22 \\
+NATS JetStream streams & 8 \\
+Unit tests        & 34 pytest tests \\
+Critical test coverage & $\sim$74\% (detectors + forecaster + scoring) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Strengths}
+
+\begin{description}[leftmargin=2cm]
+  \item[Decoupled architecture] NATS JetStream ensures no service directly depends
+    on another. A new anomaly consumer (e.g. an automated remediation service)
+    can be added without modifying existing services.
+  \item[Targeted natural-language explanation] LLM prompts written for a
+    non-DevOps audience produce explanations directly understandable by
+    developers managing their own servers.
+  \item[Change correlation] The automatic change correlation engine is absent
+    from all compared open source solutions. By linking anomalies to recent
+    changes, it reduces diagnosis time from tens of minutes to seconds.
+  \item[Zero cloud dependency] All AI processing runs locally. Data never leaves
+    the operator's server, satisfying the strictest confidentiality requirements.
+  \item[Portability] Docker Compose deployment works identically on Linux,
+    macOS and Windows with Docker Desktop.
+\end{description}
+
+\section{Identified Limitations}
+
+\begin{description}[leftmargin=2cm]
+  \item[No seasonal component in Holt-Winters] The double exponential model
+    does not capture cyclical variations (daily CPU peaks, weekly traffic).
+    Triple Holt-Winters would improve 24h forecast accuracy.
+  \item[LLM quality depends on hardware] On a machine without GPU, Llama 3.1 8B
+    inference can take 15--30 seconds. Acceptable for asynchronous explanation
+    but perceptible to the user.
+  \item[Linux-only agent change reporters] The \texttt{auth.log}, \texttt{dpkg.log}
+    and \texttt{syslog} watchers are Linux-specific. Windows server monitoring
+    requires a separate reporter implementation.
+  \item[No automated remediation] \caimp{} produces action recommendations but
+    executes no corrections automatically. This is intentional (precautionary
+    principle) but limits appeal for teams seeking autonomous operation.
+\end{description}
+
+\section{Future Perspectives}
+
+\textbf{Short term (3--6 months):}
+Triple Holt-Winters (seasonal component); Windows change reporters; native
+Slack/Teams alerts; LLM fine-tuning on organisational incidents using
+thumbs-up/down feedback dataset.
+
+\textbf{Medium term (6--18 months):}
+Trace correlation (OpenTelemetry traces in the correlation engine); assisted
+automated remediation with operator confirmation; hosted SaaS offering
+(Kubernetes per-tenant isolation); React Native mobile app with push notifications.
+
+\textbf{Long-term vision:}
+\caimp{} should become the virtual SRE of small teams — a system capable not
+only of explaining past incidents but of autonomously preventing future ones,
+while keeping the operator informed and in control.
+
+\section*{Conclusion}
+
+The results demonstrate that all objectives were fully achieved within the
+one-month timeframe. \caimp{} delivers a unique value proposition in the open
+source monitoring landscape: natural-language explanations, automatic change
+correlation, and deployment accessible to all. The identified limitations form
+a clear development roadmap for future versions.

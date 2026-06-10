@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CAIMP — AI Monitoring Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-variant": "#e0e3e5",
+        "primary-container": "#1e293b",
+        "tertiary-fixed-dim": "#ffb95f",
+        "secondary-fixed": "#89f5e7",
+        "on-error-container": "#93000a",
+        "on-secondary-container": "#006f66",
+        "surface-dim": "#d8dadc",
+        "secondary": "#006a61",
+        "surface-container": "#eceef0",
+        "surface": "#f7f9fb",
+        "on-secondary-fixed": "#00201d",
+        "surface-bright": "#f7f9fb",
+        "tertiary": "#201100",
+        "inverse-primary": "#bcc7de",
+        "on-tertiary-fixed": "#2a1700",
+        "tertiary-fixed": "#ffddb8",
+        "on-primary-fixed-variant": "#3c475a",
+        "on-error": "#ffffff",
+        "inverse-on-surface": "#eff1f3",
+        "surface-container-lowest": "#ffffff",
+        "primary-fixed-dim": "#bcc7de",
+        "outline-variant": "#c5c6cd",
+        "background": "#f7f9fb",
+        "error-container": "#ffdad6",
+        "surface-container-low": "#f2f4f6",
+        "inverse-surface": "#2d3133",
+        "outline": "#75777d",
+        "error": "#ba1a1a",
+        "tertiary-container": "#3c2300",
+        "primary-fixed": "#d8e3fb",
+        "on-tertiary": "#ffffff",
+        "on-surface-variant": "#45474c",
+        "on-secondary": "#ffffff",
+        "on-surface": "#191c1e",
+        "surface-container-high": "#e6e8ea",
+        "on-secondary-fixed-variant": "#005049",
+        "on-primary-fixed": "#111c2d",
+        "primary": "#091426",
+        "secondary-container": "#86f2e4",
+        "on-tertiary-container": "#c88000",
+        "secondary-fixed-dim": "#6bd8cb",
+        "on-tertiary-fixed-variant": "#653e00",
+        "surface-tint": "#545f73",
+        "surface-container-highest": "#e0e3e5",
+        "on-background": "#191c1e",
+        "on-primary-container": "#8590a6",
+        "on-primary": "#ffffff"
+      },
+      fontFamily: {
+        mono: ['"JetBrains Mono"', 'monospace'],
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-family: 'Material Symbols Outlined'; }
+  .kpi-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+  .kpi-hover:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.2s ease; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c5c6cd; border-radius: 10px; }
+</style>
+</head>
+<body class="bg-background text-on-background">
+
+<!-- ── Login overlay ──────────────────────────────────────────────────────── -->
+<div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-primary/95 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
+        <span class="material-symbols-outlined text-white text-xl">monitoring</span>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-on-surface tracking-tight">CAIMP</h1>
+        <p class="text-[10px] text-on-surface-variant uppercase tracking-widest">AI Monitoring Platform</p>
+      </div>
+    </div>
+    <p class="text-on-surface-variant text-sm mb-7 mt-4">Sign in to access the dashboard</p>
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Email</label>
+        <input type="email" id="login-email" value="admin@caimp.local"
+          class="w-full px-3 py-2.5 border border-outline-variant rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all bg-surface-container-low"/>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Password</label>
+        <input type="password" id="login-password" value="Admin1234!"
+          class="w-full px-3 py-2.5 border border-outline-variant rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30 focus:border-secondary transition-all bg-surface-container-low"/>
+      </div>
+      <div id="login-error" class="hidden text-error text-sm bg-error-container/30 rounded-lg px-3 py-2"></div>
+      <button type="submit" id="login-btn"
+        class="w-full py-3 bg-secondary text-white rounded-lg text-sm font-semibold hover:bg-secondary/90 transition-colors">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Main app shell ─────────────────────────────────────────────────────── -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <aside class="fixed left-0 top-0 h-full w-[260px] bg-primary flex flex-col overflow-y-auto z-20">
+    <div class="px-6 py-5 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-white text-lg">monitoring</span>
+        </div>
+        <div>
+          <h1 class="text-white font-bold text-base tracking-tight">CAIMP</h1>
+          <p class="text-on-primary-container/50 text-[10px] uppercase tracking-widest">AI Monitoring</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 space-y-0.5">
+      <button data-view="overview"  class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all text-left">
+        <span class="material-symbols-outlined text-xl">dashboard</span><span>Overview</span>
+      </button>
+      <button data-view="servers"   class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all text-left">
+        <span class="material-symbols-outlined text-xl">dns</span><span>Servers</span>
+      </button>
+      <button data-view="incidents" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all text-left">
+        <span class="material-symbols-outlined text-xl">warning</span><span>Incidents</span>
+      </button>
+      <button data-view="runbooks"  class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all text-left">
+        <span class="material-symbols-outlined text-xl">menu_book</span><span>Runbooks</span>
+      </button>
+    </nav>
+
+    <!-- Pipeline status strip -->
+    <div class="px-4 py-3 border-t border-white/10 space-y-1.5">
+      <div class="text-[9px] font-semibold uppercase tracking-widest text-on-primary-container/40 mb-2">Backend Services</div>
+      <div id="svc-query" class="flex items-center gap-2 text-[11px] text-on-primary-container/60">
+        <div class="w-1.5 h-1.5 rounded-full bg-outline flex-shrink-0"></div>Query API :8002
+      </div>
+      <div id="svc-ai" class="flex items-center gap-2 text-[11px] text-on-primary-container/60">
+        <div class="w-1.5 h-1.5 rounded-full bg-outline flex-shrink-0"></div>AI Orch :8010
+      </div>
+      <div id="svc-ws" class="flex items-center gap-2 text-[11px] text-on-primary-container/60">
+        <div class="w-1.5 h-1.5 rounded-full bg-outline flex-shrink-0"></div>WebSocket :8080
+      </div>
+    </div>
+
+    <!-- User / org footer -->
+    <div class="px-4 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center text-xs font-bold flex-shrink-0" id="user-avatar">AD</div>
+        <div class="min-w-0">
+          <p class="text-white text-xs font-semibold truncate" id="user-name">Admin</p>
+          <button id="logout-btn" class="text-[10px] text-on-primary-container/50 hover:text-error transition-colors uppercase tracking-wider">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Top bar -->
+  <header class="fixed top-0 right-0 left-[260px] h-14 bg-surface border-b border-surface-container-highest flex justify-between items-center px-6 z-10">
+    <div class="flex items-center gap-4">
+      <h2 id="page-title" class="text-base font-semibold text-on-surface">Overview</h2>
+      <div id="status-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low border border-outline-variant">
+        <div id="status-dot" class="w-1.5 h-1.5 rounded-full bg-outline"></div>
+        <span id="status-text" class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Loading…</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="refresh-btn" class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors" title="Refresh">
+        <span class="material-symbols-outlined text-xl">refresh</span>
+      </button>
+      <div class="h-6 w-px bg-outline-variant mx-1"></div>
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center text-xs font-bold" id="header-avatar">AD</div>
+        <span class="text-sm font-medium text-on-surface hidden lg:block" id="header-name">Admin</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content area -->
+  <main class="ml-[260px] pt-14 min-h-screen">
+    <div id="view-overview"  class="view p-6 space-y-5 fade-in"></div>
+    <div id="view-servers"   class="view p-6 space-y-5 fade-in hidden"></div>
+    <div id="view-incidents" class="view p-6 space-y-5 fade-in hidden"></div>
+    <div id="view-runbooks"  class="view p-6 space-y-5 fade-in hidden"></div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════════
+const AUTH_URL = '/auth'
+const API_URL  = '/api/v1'
+const WS_URL   = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/events`
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+const S = {
+  token: null, orgId: null, user: null,
+  view: 'overview',
+  servers: [], stats: null, incidents: [], runbooks: [],
+  ws: null, wsOk: false,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════════════════
+function decodeJWT(t) {
+  if (!t) return null
+  try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) }
+  catch { return null }
+}
+
+async function doLogin(email, password) {
+  const r = await fetch(`${AUTH_URL}/login`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email, password}),
+  })
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({}))
+    throw new Error(e.detail || 'Invalid credentials')
+  }
+  const d = await r.json()
+  S.token = d.access_token
+  const p = decodeJWT(S.token)
+  S.orgId = p?.org_id
+  S.user  = {email: p?.sub || email, role: p?.role}
+  localStorage.setItem('caimp_token', S.token)
+  if (S.orgId) localStorage.setItem('caimp_org', S.orgId)
+}
+
+function doLogout() {
+  localStorage.removeItem('caimp_token')
+  localStorage.removeItem('caimp_org')
+  location.reload()
+}
+
+function loadAuth() {
+  const t = localStorage.getItem('caimp_token')
+  if (!t) return false
+  const p = decodeJWT(t)
+  if (!p) return false
+  if (p.exp && Date.now()/1000 > p.exp) { localStorage.removeItem('caimp_token'); return false }
+  S.token = t
+  S.orgId = p.org_id || localStorage.getItem('caimp_org')
+  S.user  = {email: p.sub || 'Admin', role: p.role}
+  return true
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════════════════════
+async function apiGet(path) {
+  const r = await fetch(`${API_URL}${path}`, {headers:{Authorization:`Bearer ${S.token}`}})
+  if (r.status === 401) { doLogout(); return null }
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(`${API_URL}${path}`, {
+    method:'POST',
+    headers:{Authorization:`Bearer ${S.token}`,'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  })
+  if (r.status === 401) { doLogout(); return null }
+  return r.ok ? r.json().catch(()=>null) : null
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadAll() {
+  setStatus('loading')
+  try {
+    const [srvRes, statRes, incRes] = await Promise.allSettled([
+      apiGet('/servers'),
+      apiGet('/incidents/stats'),
+      apiGet('/incidents?limit=100'),
+    ])
+    if (srvRes.status  === 'fulfilled' && srvRes.value)  S.servers   = srvRes.value
+    if (statRes.status === 'fulfilled' && statRes.value) S.stats     = statRes.value
+    if (incRes.status  === 'fulfilled' && incRes.value)  S.incidents = incRes.value
+    setStatus('ok')
+    renderCurrent()
+  } catch (e) {
+    setStatus('error')
+    console.error(e)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEBSOCKET
+// ═══════════════════════════════════════════════════════════════════════════
+function connectWS() {
+  try {
+    const url = S.orgId ? `${WS_URL}?org_id=${S.orgId}` : WS_URL
+    S.ws = new WebSocket(url)
+    S.ws.onopen    = () => { S.wsOk = true;  updateSvc('svc-ws', true)  }
+    S.ws.onclose   = () => { S.wsOk = false; updateSvc('svc-ws', false); setTimeout(connectWS, 5000) }
+    S.ws.onerror   = () => { S.wsOk = false; updateSvc('svc-ws', false) }
+    S.ws.onmessage = (e) => { try { handleWS(JSON.parse(e.data)) } catch {} }
+  } catch { updateSvc('svc-ws', false) }
+}
+
+function handleWS(msg) {
+  const t = msg.type || msg.event_type || ''
+  if (/anomaly/i.test(t) || /incident/i.test(t)) { loadAll() }
+  else if (/explanation/i.test(t) && S.view === 'overview') { loadAll() }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVICE HEALTH PROBES
+// ═══════════════════════════════════════════════════════════════════════════
+async function probeServices() {
+  const checks = await Promise.allSettled([
+    fetch('/api/v1/health', {headers:{Authorization:`Bearer ${S.token}`}, signal:AbortSignal.timeout(3000)}).then(r=>r.ok),
+    fetch('/api/ai/health', {signal:AbortSignal.timeout(3000)}).then(r=>r.ok),
+  ])
+  updateSvc('svc-query', checks[0].status==='fulfilled' && checks[0].value)
+  updateSvc('svc-ai',    checks[1].status==='fulfilled' && checks[1].value)
+}
+
+function updateSvc(id, ok) {
+  const el = document.getElementById(id)
+  if (!el) return
+  const dot = el.querySelector('div')
+  if (dot) dot.style.background = ok ? '#006a61' : '#75777d'
+  el.style.color = ok ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)'
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATUS PILL
+// ═══════════════════════════════════════════════════════════════════════════
+function setStatus(state) {
+  const dot  = document.getElementById('status-dot')
+  const text = document.getElementById('status-text')
+  if (!dot || !text) return
+  const map = {
+    loading: ['#d97706', 'Refreshing…'],
+    ok:      ['#006a61', `Live — ${new Date().toLocaleTimeString()}`],
+    error:   ['#ba1a1a', 'Connection error'],
+  }
+  const [color, label] = map[state] || map.ok
+  dot.style.background = color
+  text.textContent = label
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function switchView(view) {
+  S.view = view
+  // Update nav buttons
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const active = btn.dataset.view === view
+    btn.className = `nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all text-left ${
+      active
+        ? 'bg-white/10 text-secondary-fixed font-semibold border-l-2 border-secondary-fixed pl-[10px]'
+        : 'text-on-primary-container/70 hover:text-white hover:bg-white/5 font-normal border-l-2 border-transparent pl-[10px]'
+    }`
+  })
+  // Show/hide views
+  document.querySelectorAll('.view').forEach(el => {
+    el.classList.toggle('hidden', !el.id.endsWith(view))
+  })
+  // Page title
+  const titles = {overview:'Overview', servers:'Servers', incidents:'Incidents', runbooks:'Runbooks'}
+  document.getElementById('page-title').textContent = titles[view] || view
+  // Render
+  if (view === 'overview')  renderOverview()
+  if (view === 'servers')   renderServers()
+  if (view === 'incidents') renderIncidents()
+  if (view === 'runbooks')  renderRunbooks()
+}
+
+function renderCurrent() { switchView(S.view) }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHART HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+function areaChart(data, color='#006a61') {
+  const W=520, H=200, PL=36, PR=8, PT=10, PB=28
+  const cw=W-PL-PR, ch=H-PT-PB
+  const max = Math.max(...data.map(d=>d.v), 1)
+  const pts = data.map((d,i)=>({
+    x: PL + (i/(data.length-1))*cw,
+    y: PT + (1-d.v/max)*ch,
+    ...d
+  }))
+  const line = pts.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const area = `${line} L${pts[pts.length-1].x.toFixed(1)},${(PT+ch).toFixed(1)} L${PL},${(PT+ch).toFixed(1)} Z`
+  const grids = [0,.25,.5,.75,1].map(f=>{
+    const y=PT+(1-f)*ch, v=Math.round(f*max)
+    return `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="#e0e3e5" stroke-width="1"/>
+            <text x="${PL-4}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#75777d">${v}</text>`
+  }).join('')
+  const dots = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="white" stroke="${color}" stroke-width="2"><title>${p.label||''}: ${p.v}</title></circle>`).join('')
+  const labels = pts.map(p=>`<text x="${p.x.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#75777d">${p.label||''}</text>`).join('')
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="overflow:visible">
+    <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grids}
+    <path d="${area}" fill="url(#ag)"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+    ${dots}${labels}
+  </svg>`
+}
+
+function donutChart(segs, size=160) {
+  const total = segs.reduce((s,g)=>s+g.v,0)
+  if (!total) return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2-12}" fill="transparent" stroke="#e0e3e5" stroke-width="14"/></svg>`
+  const r=size/2-12, cx=size/2, cy=size/2, sw=14, circ=2*Math.PI*r
+  let off=0
+  const arcs = segs.map(g=>{
+    const dash=(g.v/total)*circ, gap=circ-dash
+    const arc=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="transparent" stroke="${g.color}" stroke-width="${sw}"
+      stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}"
+      stroke-dashoffset="${(-off).toFixed(2)}"
+      transform="rotate(-90 ${cx} ${cy})"><title>${g.label}: ${g.v}</title></circle>`
+    off+=dash; return arc
+  }).join('')
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="transparent" stroke="#e0e3e5" stroke-width="${sw}"/>
+    ${arcs}
+  </svg>`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KPI CARD
+// ═══════════════════════════════════════════════════════════════════════════
+function kpiCard({icon, label, value, badge, badgeOk=true, iconBg='bg-secondary-container/20 text-secondary'}) {
+  const badgeColor = badgeOk ? 'text-secondary' : 'text-on-tertiary-container'
+  const badgeIcon  = badgeOk ? 'trending_up'    : 'warning'
+  return `
+  <div class="kpi-hover bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col justify-between hover:border-secondary transition-colors duration-300 cursor-default">
+    <div class="flex justify-between items-start">
+      <span class="p-2 ${iconBg} rounded-lg"><span class="material-symbols-outlined">${icon}</span></span>
+      ${badge ? `<span class="flex items-center gap-1 ${badgeColor} text-xs font-semibold">${badge}<span class="material-symbols-outlined text-sm">${badgeIcon}</span></span>` : ''}
+    </div>
+    <div class="mt-4">
+      <p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">${label}</p>
+      <h3 class="text-2xl font-bold text-on-surface mt-0.5">${value}</h3>
+    </div>
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEV / STATUS HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const SEV_COLOR = {critical:'#ba1a1a', high:'#ea580c', medium:'#d97706', low:'#006a61'}
+const AI_COLOR  = {complete:'#006a61', error:'#ba1a1a', pending:'#d97706'}
+const TYPE_LABEL = {cpu_saturation:'CPU Saturation', memory_pressure:'Memory Pressure', disk_fill:'Disk Fill', network_anomaly:'Network Anomaly', security_event:'Security Event'}
+
+function sevBadge(sev) {
+  const c = SEV_COLOR[sev] || '#75777d'
+  return `<span style="background:${c}18;color:${c}" class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider">${sev}</span>`
+}
+function aiBadge(s) {
+  if (!s) return '<span class="text-on-surface-variant text-xs">—</span>'
+  const c = AI_COLOR[s] || '#75777d'
+  return `<span style="background:${c}15;color:${c}" class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider">${s}</span>`
+}
+function initials(str) { return (str||'??').slice(0,2).toUpperCase() }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW: OVERVIEW
+// ═══════════════════════════════════════════════════════════════════════════
+function renderOverview() {
+  const srv = S.servers, st = S.stats, inc = S.incidents
+  const online   = srv.filter(s=>s.status==='online').length
+  const critical = st?.by_severity?.critical ?? 0
+  const high     = st?.by_severity?.high     ?? 0
+  const medium   = st?.by_severity?.medium   ?? 0
+  const low      = st?.by_severity?.low      ?? 0
+  const pending  = st?.pending_explanations  ?? 0
+  const total    = st?.total ?? '—'
+
+  // 7-day chart data
+  const now = new Date()
+  const days = Array.from({length:7},(_,i)=>{
+    const d = new Date(now); d.setDate(d.getDate()-(6-i))
+    return {label:d.toLocaleDateString([],{weekday:'short'}), date:d.toDateString(), v:0}
+  })
+  for (const x of inc) {
+    const day = days.find(d=>d.date===new Date(x.detected_at).toDateString())
+    if (day) day.v++
+  }
+
+  const donutSegs = [
+    {color:'#ba1a1a', v:critical, label:'Critical'},
+    {color:'#ea580c', v:high,     label:'High'},
+    {color:'#d97706', v:medium,   label:'Medium'},
+    {color:'#006a61', v:low,      label:'Low'},
+  ].filter(s=>s.v>0)
+
+  const recentRows = inc.slice(0,10).map(x=>`
+    <tr class="hover:bg-surface-container-low transition-colors">
+      <td class="px-5 py-3 font-mono text-xs text-on-surface">#${x.id.slice(0,8)}</td>
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center text-[10px] font-bold flex-shrink-0">${initials(x.host)}</div>
+          <span class="text-sm font-medium text-on-surface">${x.host}</span>
+        </div>
+      </td>
+      <td class="px-5 py-3 text-sm text-on-surface">${x.metric_name?.replace('system.','')||'—'}</td>
+      <td class="px-5 py-3 font-mono text-xs text-on-surface">${x.value!=null?x.value.toFixed(1):'—'}</td>
+      <td class="px-5 py-3">${sevBadge(x.severity)}</td>
+      <td class="px-5 py-3">${aiBadge(x.explanation_status)}</td>
+      <td class="px-5 py-3 text-xs text-on-surface-variant">${new Date(x.detected_at).toLocaleDateString([],{month:'short',day:'numeric'})}</td>
+    </tr>`).join('')
+
+  document.getElementById('view-overview').innerHTML = `
+  <!-- KPI row -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    ${kpiCard({icon:'dns', label:'Total Servers', value:srv.length, badge:`${online} online`, badgeOk:true})}
+    ${kpiCard({icon:'check_circle', label:'Online', value:online, badge:srv.length?`${Math.round(online/srv.length*100)}%`:'—', badgeOk:true, iconBg:'bg-secondary-container/20 text-secondary'})}
+    ${kpiCard({icon:'warning', label:'Total Incidents', value:total, badge:critical>0?`${critical} critical`:null, badgeOk:false, iconBg:'bg-error-container/30 text-on-error-container'})}
+    ${kpiCard({icon:'smart_toy', label:'Pending AI Analysis', value:pending, badge:pending>0?'In pipeline':null, badgeOk:false, iconBg:'bg-tertiary-fixed/30 text-on-tertiary-container'})}
+  </section>
+
+  <!-- Charts -->
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col">
+      <div class="flex justify-between items-start mb-5">
+        <div>
+          <h4 class="text-base font-semibold text-on-surface">Incident Timeline</h4>
+          <p class="text-on-surface-variant text-sm">Last 7 days</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-secondary"></div>
+          <span class="text-xs text-on-surface-variant font-semibold uppercase tracking-wider">Anomalies</span>
+        </div>
+      </div>
+      <div class="flex-1 min-h-[200px]">${areaChart(days)}</div>
+    </div>
+
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col">
+      <h4 class="text-base font-semibold text-on-surface mb-5">By Severity</h4>
+      <div class="flex-1 flex flex-col items-center justify-center gap-5">
+        <div class="relative flex items-center justify-center">
+          ${donutChart(donutSegs.length ? donutSegs : [{color:'#e0e3e5',v:1,label:'None'}])}
+          <div class="absolute text-center pointer-events-none">
+            <p class="text-2xl font-bold text-on-surface">${total}</p>
+            <p class="text-xs text-on-surface-variant">Total</p>
+          </div>
+        </div>
+        <div class="w-full space-y-2">
+          ${[['Critical','#ba1a1a',critical],['High','#ea580c',high],['Medium','#d97706',medium],['Low','#006a61',low]].map(([l,c,v])=>`
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full" style="background:${c}"></div><span class="text-sm text-on-surface">${l}</span></div>
+            <span class="text-xs font-semibold text-on-surface">${v}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recent incidents -->
+  <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+    <div class="px-5 py-4 border-b border-outline-variant flex justify-between items-center">
+      <h4 class="text-base font-semibold text-on-surface">Recent Incidents</h4>
+      <button onclick="switchView('incidents')" class="text-secondary text-xs font-semibold hover:underline">View All →</button>
+    </div>
+    ${inc.length===0 ? `<div class="py-12 text-center text-on-surface-variant text-sm"><span class="material-symbols-outlined block text-4xl text-secondary mb-2">check_circle</span>No incidents</div>` : `
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead><tr class="bg-surface-container-low">
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">ID</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Host</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Metric</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Value</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Severity</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">AI Status</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Date</th>
+        </tr></thead>
+        <tbody class="divide-y divide-outline-variant/30">${recentRows}</tbody>
+      </table>
+    </div>`}
+  </section>`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW: SERVERS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderServers() {
+  const srv = S.servers
+  const online = srv.filter(s=>s.status==='online').length
+
+  const rows = srv.map(s=>{
+    const on = s.status==='online'
+    const sc = on ? '#006a61' : '#75777d'
+    const cpu  = s.cpu_pct  != null ? s.cpu_pct.toFixed(1)+'%'  : '—'
+    const ram  = s.ram_pct  != null ? s.ram_pct.toFixed(1)+'%'  : '—'
+    const disk = s.disk_pct != null ? s.disk_pct.toFixed(1)+'%' : '—'
+
+    function bar(val, warn=70, danger=90) {
+      if (val==null) return '<span class="text-on-surface-variant">—</span>'
+      const pct = parseFloat(val)
+      const color = pct>=danger ? '#ba1a1a' : pct>=warn ? '#d97706' : '#006a61'
+      return `<div class="flex items-center gap-2">
+        <div class="w-16 h-1.5 bg-outline-variant rounded-full overflow-hidden">
+          <div class="h-full rounded-full" style="width:${Math.min(pct,100)}%;background:${color}"></div>
+        </div>
+        <span class="font-mono text-xs text-on-surface">${val}</span>
+      </div>`
+    }
+
+    return `<tr class="hover:bg-surface-container-low transition-colors">
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-secondary-container/30 text-secondary flex items-center justify-center text-xs font-bold flex-shrink-0">${initials(s.name||s.hostname)}</div>
+          <div>
+            <div class="text-sm font-semibold text-on-surface">${s.name||s.hostname||'—'}</div>
+            <div class="font-mono text-[10px] text-on-surface-variant">${s.hostname||''}</div>
+          </div>
+        </div>
+      </td>
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full" style="background:${sc}"></div>
+          <span class="text-xs font-semibold" style="color:${sc}">${on?'Online':'Offline'}</span>
+        </div>
+      </td>
+      <td class="px-5 py-3">${bar(s.cpu_pct)}</td>
+      <td class="px-5 py-3">${bar(s.ram_pct)}</td>
+      <td class="px-5 py-3">${bar(s.disk_pct,80,95)}</td>
+      <td class="px-5 py-3 font-mono text-xs text-on-surface">${s.anomaly_count??'—'}</td>
+    </tr>`
+  }).join('')
+
+  document.getElementById('view-servers').innerHTML = `
+  <section class="grid grid-cols-3 gap-4">
+    ${kpiCard({icon:'dns', label:'Total Servers', value:srv.length, badge:'', badgeOk:true})}
+    ${kpiCard({icon:'check_circle', label:'Online', value:online, badge:'', badgeOk:true})}
+    ${kpiCard({icon:'cancel', label:'Offline', value:srv.length-online, badge:'', badgeOk:false, iconBg:'bg-error-container/30 text-on-error-container'})}
+  </section>
+  <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+    <div class="px-5 py-4 border-b border-outline-variant">
+      <h4 class="text-base font-semibold text-on-surface">All Servers</h4>
+      <p class="text-sm text-on-surface-variant">Live metrics from CAIMP monitoring agents</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead><tr class="bg-surface-container-low">
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Server</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Status</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">CPU</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">RAM</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Disk</th>
+          <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Anomalies</th>
+        </tr></thead>
+        <tbody class="divide-y divide-outline-variant/30">
+          ${rows||'<tr><td colspan="6" class="px-5 py-12 text-center text-on-surface-variant">No servers found</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </section>`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW: INCIDENTS (async — fetches fresh data)
+// ═══════════════════════════════════════════════════════════════════════════
+async function renderIncidents() {
+  const el = document.getElementById('view-incidents')
+  el.innerHTML = '<div class="flex items-center gap-3 p-8 text-on-surface-variant"><span class="spin material-symbols-outlined">refresh</span>Loading incidents…</div>'
+  try {
+    const [st, inc] = await Promise.all([apiGet('/incidents/stats'), apiGet('/incidents?limit=60')])
+    const critical = st?.by_severity?.critical ?? 0
+    const rows = (inc||[]).map(x=>`
+      <tr class="hover:bg-surface-container-low transition-colors cursor-pointer" onclick="expandRow('${x.id}',this)">
+        <td class="px-5 py-3 font-mono text-xs text-on-surface">#${x.id.slice(0,8)}</td>
+        <td class="px-5 py-3 text-sm font-semibold text-on-surface">${x.host}</td>
+        <td class="px-5 py-3 text-sm text-on-surface">${TYPE_LABEL[x.anomaly_type]||x.anomaly_type}</td>
+        <td class="px-5 py-3 font-mono text-xs text-on-surface">${x.metric_name?.replace('system.','')||'—'}</td>
+        <td class="px-5 py-3 font-mono text-xs text-on-surface">${x.value!=null?x.value.toFixed(1):'—'}</td>
+        <td class="px-5 py-3">${sevBadge(x.severity)}</td>
+        <td class="px-5 py-3">${aiBadge(x.explanation_status)}</td>
+        <td class="px-5 py-3 text-xs text-on-surface-variant">${new Date(x.detected_at).toLocaleDateString([],{month:'short',day:'numeric'})}</td>
+      </tr>`).join('')
+    el.innerHTML = `
+    <section class="grid grid-cols-4 gap-4">
+      ${kpiCard({icon:'warning', label:'Total Incidents', value:st?.total??'—', badge:'', badgeOk:false, iconBg:'bg-error-container/30 text-on-error-container'})}
+      ${kpiCard({icon:'emergency', label:'Critical', value:critical, badge:critical>0?'Action needed':null, badgeOk:false, iconBg:'bg-error-container/30 text-on-error-container'})}
+      ${kpiCard({icon:'trending_up', label:'High Severity', value:st?.by_severity?.high??0, badge:'', badgeOk:false, iconBg:'bg-tertiary-fixed/30 text-on-tertiary-container'})}
+      ${kpiCard({icon:'smart_toy', label:'Pending AI', value:st?.pending_explanations??'—', badge:'', badgeOk:true})}
+    </section>
+    <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-outline-variant">
+        <h4 class="text-base font-semibold text-on-surface">All Incidents</h4>
+        <p class="text-sm text-on-surface-variant">Click a row to expand AI analysis</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left" id="inc-table">
+          <thead><tr class="bg-surface-container-low">
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">ID</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Host</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Type</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Metric</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Value</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Severity</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">AI Status</th>
+            <th class="px-5 py-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Date</th>
+          </tr></thead>
+          <tbody class="divide-y divide-outline-variant/30">
+            ${rows||'<tr><td colspan="8" class="px-5 py-12 text-center text-on-surface-variant">No incidents found</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </section>`
+  } catch(e) {
+    el.innerHTML = `<div class="p-6 text-error text-sm">Failed to load: ${e.message}</div>`
+  }
+}
+
+async function expandRow(id, row) {
+  const existingId = `detail-${id}`
+  const existing = document.getElementById(existingId)
+  if (existing) { existing.remove(); row.style.background=''; return }
+  row.style.background = 'var(--tw-color-surface-container, #eceef0)'
+
+  const detail = document.createElement('tr')
+  detail.id = existingId
+  detail.innerHTML = `<td colspan="8" class="px-0 py-0">
+    <div class="mx-4 my-3 border border-outline-variant rounded-xl p-5 bg-surface">
+      <div class="flex items-center gap-2 text-on-surface-variant text-sm"><span class="spin material-symbols-outlined">refresh</span>Loading AI analysis…</div>
+    </div></td>`
+  row.insertAdjacentElement('afterend', detail)
+
+  try {
+    const d = await apiGet(`/incidents/${id}`)
+    const exp = d?.explanation
+    if (!exp) { detail.querySelector('div').innerHTML='<p class="text-sm text-on-surface-variant">No AI analysis available.</p>'; return }
+
+    const sc = SEV_COLOR[exp.severity]||'#75777d'
+    const cc = {high:'#006a61',medium:'#d97706',low:'#ba1a1a'}[exp.confidence]||'#75777d'
+
+    detail.querySelector('div').innerHTML = `
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <span class="text-xs font-bold text-secondary uppercase tracking-wider">AI Analysis</span>
+        ${exp.severity?`<span style="background:${sc}18;color:${sc}" class="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase">${exp.severity}</span>`:''}
+        ${exp.confidence?`<span style="color:${cc}" class="text-xs font-semibold">Confidence: ${exp.confidence}</span>`:''}
+        ${exp.llm_provider?`<span class="ml-auto font-mono text-xs text-on-surface-variant bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant">via ${exp.llm_provider}</span>`:''}
+      </div>
+      ${exp.explanation?`<p class="text-sm text-on-surface leading-relaxed mb-4">${exp.explanation}</p>`:''}
+      ${exp.root_cause||exp.recommended_action?`
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        ${exp.root_cause?`<div class="border border-outline-variant rounded-lg p-4" style="border-left:3px solid #d97706">
+          <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Root Cause</div>
+          <p class="text-sm text-on-surface">${exp.root_cause}</p></div>`:''}
+        ${exp.recommended_action?`<div class="border border-outline-variant rounded-lg p-4" style="border-left:3px solid #006a61">
+          <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Recommended Action</div>
+          <p class="text-sm text-on-surface">${exp.recommended_action}</p></div>`:''}
+      </div>`:''}
+      ${(exp.evidence_spl_queries||[]).length?`
+      <div class="mb-4">
+        <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Verification SPL</div>
+        ${exp.evidence_spl_queries.map(q=>`<pre class="bg-primary text-secondary-fixed p-3 rounded-lg text-[11px] font-mono overflow-x-auto whitespace-pre-wrap mb-2">${q}</pre>`).join('')}
+      </div>`:''}
+      <div class="flex items-center gap-3 pt-3 border-t border-outline-variant">
+        <span class="text-xs text-on-surface-variant">Helpful?</span>
+        <button onclick="giveFeedback('${id}',1,this)" class="px-3 py-1 bg-surface-container border border-outline-variant rounded-lg text-sm hover:bg-secondary-container/20 transition-colors">👍</button>
+        <button onclick="giveFeedback('${id}',-1,this)" class="px-3 py-1 bg-surface-container border border-outline-variant rounded-lg text-sm hover:bg-error-container/20 transition-colors">👎</button>
+      </div>`
+  } catch(e) {
+    detail.querySelector('div').innerHTML = `<p class="text-sm text-error">Failed to load: ${e.message}</p>`
+  }
+}
+
+async function giveFeedback(id, rating, btn) {
+  await apiPost(`/incidents/${id}/feedback`, {rating})
+  btn.parentElement.innerHTML = '<span class="text-secondary text-xs font-semibold">✓ Feedback recorded — thank you</span>'
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW: RUNBOOKS
+// ═══════════════════════════════════════════════════════════════════════════
+async function renderRunbooks() {
+  const el = document.getElementById('view-runbooks')
+  el.innerHTML = '<div class="flex items-center gap-3 p-8 text-on-surface-variant"><span class="spin material-symbols-outlined">refresh</span>Loading runbooks…</div>'
+  try {
+    const rb = await apiGet('/runbooks') || []
+    S.runbooks = rb
+    const TYPE_COLOR = {cpu_saturation:'#dc2626',memory_pressure:'#d97706',disk_fill:'#ca8a04',network_anomaly:'#2563eb',security_event:'#9333ea'}
+    const ragCount = rb.filter(r=>r.has_embedding).length
+    const missing  = rb.length - ragCount
+
+    const cards = rb.map(r=>{
+      const c = TYPE_COLOR[r.anomaly_type]||'#75777d'
+      const l = TYPE_LABEL[r.anomaly_type]||r.anomaly_type
+      return `
+      <div class="kpi-hover bg-surface-container-lowest border border-outline-variant rounded-xl p-4 transition-colors hover:border-secondary" style="border-left:3px solid ${c}">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex-1 min-w-0 mr-3">
+            <h5 class="text-sm font-semibold text-on-surface mb-2 leading-snug">${r.title}</h5>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span style="background:${c}18;color:${c}" class="px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">${l}</span>
+              ${r.has_embedding
+                ? '<span class="px-2 py-0.5 bg-secondary-container/20 text-secondary text-[9px] font-bold rounded-full uppercase tracking-wider">✦ pgvector</span>'
+                : '<span class="px-2 py-0.5 bg-tertiary-fixed/20 text-on-tertiary-fixed-variant text-[9px] font-bold rounded-full uppercase tracking-wider">No embed</span>'}
+            </div>
+          </div>
+        </div>
+        <p class="font-mono text-[10px] text-on-surface-variant">Updated ${new Date(r.updated_at).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})}</p>
+      </div>`
+    }).join('')
+
+    el.innerHTML = `
+    <section class="grid grid-cols-4 gap-4">
+      ${kpiCard({icon:'menu_book', label:'Total Runbooks', value:rb.length, badge:'', badgeOk:true})}
+      ${kpiCard({icon:'hub', label:'RAG-Indexed', value:ragCount, badge:`${Math.round(ragCount/Math.max(rb.length,1)*100)}%`, badgeOk:true})}
+      ${kpiCard({icon:'category', label:'Types Covered', value:new Set(rb.map(r=>r.anomaly_type)).size, badge:'', badgeOk:true})}
+      ${kpiCard({icon:'warning', label:'No Embedding', value:missing, badge:missing>0?'Needs indexing':null, badgeOk:false, iconBg:'bg-tertiary-fixed/30 text-on-tertiary-container'})}
+    </section>
+    <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-outline-variant">
+        <h4 class="text-base font-semibold text-on-surface">Knowledge Base</h4>
+        <p class="text-sm text-on-surface-variant">Runbooks are vectorised by Ollama and stored in pgvector for AI retrieval</p>
+      </div>
+      <div class="p-5">
+        ${rb.length===0
+          ? '<p class="text-center text-on-surface-variant py-8 text-sm">No runbooks yet. Create one in the React UI.</p>'
+          : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${cards}</div>`}
+      </div>
+    </section>`
+  } catch(e) {
+    el.innerHTML = `<div class="p-6 text-error text-sm">Failed to load: ${e.message}</div>`
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════════════
+function showApp() {
+  document.getElementById('login-overlay').classList.add('hidden')
+  document.getElementById('app').classList.remove('hidden')
+
+  if (S.user) {
+    const u = S.user.email.split('@')[0]
+    const av = u.slice(0,2).toUpperCase()
+    document.getElementById('user-name').textContent     = u
+    document.getElementById('user-avatar').textContent   = av
+    document.getElementById('header-name').textContent   = u
+    document.getElementById('header-avatar').textContent = av
+  }
+
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', ()=>switchView(btn.dataset.view)))
+  document.getElementById('logout-btn').addEventListener('click', doLogout)
+  document.getElementById('refresh-btn').addEventListener('click', ()=>{loadAll(); if(S.view==='incidents')renderIncidents(); if(S.view==='runbooks')renderRunbooks()})
+
+  switchView('overview')
+  loadAll()
+  connectWS()
+  probeServices()
+  setInterval(loadAll, 30_000)
+  setInterval(probeServices, 30_000)
+}
+
+document.getElementById('login-form').addEventListener('submit', async e=>{
+  e.preventDefault()
+  const btn = document.getElementById('login-btn')
+  const err = document.getElementById('login-error')
+  btn.textContent = 'Signing in…'; btn.disabled = true
+  err.classList.add('hidden')
+  try {
+    await doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value)
+    showApp()
+  } catch(ex) {
+    err.textContent = ex.message; err.classList.remove('hidden')
+    btn.textContent = 'Sign In'; btn.disabled = false
+  }
+})
+
+if (loadAuth()) showApp()
+</script>
+</body>
+</html>

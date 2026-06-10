@@ -1,0 +1,102 @@
+% ============================================================================
+% Annexe A — Schéma de la base de données
+% ============================================================================
+\chapter{Schéma de la base de données}
+
+Cette annexe présente le schéma SQL complet des tables principales de \caimp{},
+dans l'ordre des migrations (000001 à 000014).
+
+\begin{lstlisting}[language=SQL, caption={Tables core (migration 000002)}]
+CREATE TABLE organizations (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name       TEXT NOT NULL,
+    plan       TEXT NOT NULL DEFAULT 'free',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE users (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'viewer'
+                  CHECK (role IN ('admin', 'devops', 'viewer')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE servers (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id         UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name           TEXT NOT NULL,
+    hostname       TEXT NOT NULL,
+    ip_address     INET,
+    status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('online','degraded','offline','pending')),
+    last_heartbeat TIMESTAMPTZ,
+    agent_version  TEXT,
+    labels         JSONB NOT NULL DEFAULT '{}',
+    UNIQUE (org_id, hostname)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Hypertable métriques (migration 000003)}]
+CREATE TABLE metrics (
+    time        TIMESTAMPTZ NOT NULL,
+    org_id      UUID NOT NULL,
+    server_id   UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    metric_name TEXT NOT NULL,
+    value       DOUBLE PRECISION NOT NULL,
+    labels      JSONB DEFAULT '{}'
+);
+-- Conversion en hypertable TimescaleDB (partitionnement par 7 jours)
+SELECT create_hypertable('metrics', 'time', chunk_time_interval => INTERVAL '7 days');
+CREATE INDEX ON metrics (server_id, metric_name, time DESC);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Documents RAG avec pgvector (migration 000006)}]
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE rag_documents (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    type       TEXT NOT NULL,  -- 'runbook' | 'incident' | 'knowledge'
+    title      TEXT,
+    content    TEXT NOT NULL,
+    embedding  VECTOR(768),    -- nomic-embed-text (768 dimensions)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Index HNSW pour la recherche approximative par similarité cosinus
+CREATE INDEX idx_rag_hnsw ON rag_documents
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Événements de changement (migration 000014)}]
+CREATE TABLE change_events (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    server_id   UUID REFERENCES servers(id) ON DELETE SET NULL,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    change_type TEXT NOT NULL,  -- 'deployment'|'config'|'restart'|'package'|...
+    source      TEXT NOT NULL,  -- 'github_webhook'|'agent'|'docker_events'|...
+    actor       TEXT,
+    description TEXT,
+    payload     JSONB NOT NULL DEFAULT '{}',
+    git_sha     TEXT,
+    image_sha   TEXT
+);
+SELECT create_hypertable('change_events', 'occurred_at', if_not_exists => TRUE);
+
+CREATE TABLE root_cause_analyses (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id              UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    anomaly_event_id    UUID REFERENCES anomaly_events(id) ON DELETE SET NULL,
+    server_id           UUID REFERENCES servers(id) ON DELETE SET NULL,
+    likely_cause        TEXT NOT NULL,
+    confidence          NUMERIC(4,3) NOT NULL DEFAULT 0,
+    correlated_changes  JSONB NOT NULL DEFAULT '[]',
+    narrative           TEXT NOT NULL,
+    recommended_actions JSONB NOT NULL DEFAULT '[]',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+\end{lstlisting}

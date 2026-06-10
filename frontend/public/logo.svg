@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="600" height="160">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5c4033;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3d2b1f;stop-opacity:1" />
+    </linearGradient>
+    <style>
+      .text-logo {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-size: 80px;
+        font-weight: 800;
+        fill: #3d2b1f;
+        letter-spacing: -2px;
+      }
+      .text-sub {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        font-size: 18px;
+        font-weight: 600;
+        fill: #7a6a5e;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+      }
+    </style>
+  </defs>
+
+  <!-- Logo Icon -->
+  <g transform="translate(10, 10) scale(0.55)">
+    <rect width="256" height="256" rx="60" fill="#f5ede8" />
+    <path d="M 190 75 A 80 80 0 1 0 190 181" fill="none" stroke="url(#grad1)" stroke-width="24" stroke-linecap="round" />
+    <path d="M 70 128 L 100 128 L 115 90 L 140 166 L 155 128 L 185 128" fill="none" stroke="#3d2b1f" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- Text -->
+  <text x="180" y="105" class="text-logo">CAIMP</text>
+  <text x="185" y="135" class="text-sub">INFRASTRUCTURE MONITOR</text>
+</svg>

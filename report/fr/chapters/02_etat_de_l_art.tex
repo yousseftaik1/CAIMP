@@ -1,0 +1,281 @@
+% ============================================================================
+% Chapitre 2 — État de l'art
+% ============================================================================
+\chapter{État de l'art}
+
+\section*{Introduction}
+
+Ce chapitre examine les solutions de supervision existantes, les techniques de
+détection d'anomalies disponibles, et les avancées récentes en matière de modèles
+de langage appliqués aux opérations informatiques. Cette analyse comparative est
+indispensable pour justifier les choix architecturaux de \caimp{} et démontrer
+la valeur ajoutée de l'approche retenue.
+
+\section{Solutions de supervision commerciales}
+
+\subsection{Datadog}
+
+Datadog est une plateforme \textsc{saas} de monitoring fondée en 2010, devenue
+l'une des références du marché avec plus de 27~000 clients en 2023.
+Son architecture repose sur un agent léger (\texttt{datadog-agent}) installé
+sur chaque hôte, qui collecte métriques, traces et journaux et les envoie
+vers les datacenters Datadog.
+
+\textbf{Points forts :} intégrations natives avec plus de 700 technologies,
+tableau de bord personnalisable, fonctionnalités d'apprentissage automatique
+(\textit{Watchdog}) pour la détection d'anomalies, corrélation automatique
+des signaux, \textsc{apm} (\textit{Application Performance Monitoring}).
+
+\textbf{Limites :} tarification à l'hôte (15~\$/mois par hôte pour l'offre
+Infrastructure, 31~\$/mois avec APM) rédhibitoire pour les petites équipes ;
+données hébergées aux États-Unis, posant des questions de conformité \textsc{rgpd} ;
+aucun déploiement \textit{on-premise} disponible ; les explications générées
+par l'IA restent superficielles et ne s'appuient pas sur un \textsc{llm} generatif.
+
+\subsection{Grafana + Prometheus}
+
+La combinaison Grafana / Prometheus est devenue le standard \textit{de facto}
+de l'observabilité open source. Prometheus \cite{timescaledb2017} est un système
+de surveillance pull-based avec une base de données temporelles propriétaire
+(TSDB) et un langage de requête dédié (PromQL). Grafana est un outil de
+visualisation connectant des dizaines de sources de données.
+
+\textbf{Points forts :} entièrement open source, communauté active, excellent
+pour les architectures Kubernetes, grande flexibilité des alertes
+(Alertmanager), intégrations étendues.
+
+\textbf{Limites :} absence totale d'IA native ; TSDB de Prometheus non conçue
+pour les requêtes analytiques complexes (pas de fenêtres glissantes, pas
+d'agrégats temporels avancés) ; nécessite une expertise significative pour la
+configuration ; génère facilement de la fatigue d'alertes sans déduplication
+intelligente.
+
+\subsection{New Relic}
+
+New Relic est une plateforme \textsc{saas} centrée sur la performance applicative
+(\textsc{apm}) avec des capacités d'infrastructure monitoring. Son architecture
+Telemetry Data Platform ingère plusieurs types de signaux dans un \textit{data lake}
+unifié. La fonctionnalité \textit{New Relic AI} (NR AI) propose une détection
+d'anomalies basée sur des algorithmes de machine learning propriétaires.
+
+\textbf{Limites :} modèle de facturation à la consommation de données imprévisible
+pour les charges variables ; l'IA reste un moteur de classification, sans
+explication en langage naturel.
+
+\subsection{Dynatrace}
+
+Dynatrace se distingue par son moteur \textit{Davis AI}, un système d'analyse
+causale automatique qui corrèle les anomalies à travers la pile applicative
+complète. Davis est capable de remonter automatiquement la chaîne de causalité
+d'un incident depuis le symptôme jusqu'à la cause racine.
+
+\textbf{Points forts :} analyse causale la plus avancée du marché, autodécouverte
+des topologies.
+
+\textbf{Limites :} tarification extrêmement élevée (de l'ordre de 69~\$/mois
+par \textit{full-stack host}) ; propriétaire et fermé ; ne convient pas aux petites
+structures.
+
+\subsection{Splunk + ITSI}
+
+Splunk Enterprise est une plateforme d'analyse de journaux et de métriques
+massivement utilisée en environnement d'entreprise. Son module \textit{IT Service
+Intelligence} (\textsc{itsi}) \cite{splunk_itsi} ajoute des fonctionnalités de
+détection d'anomalies basées sur le \textit{Machine Learning Toolkit} (\textsc{mltk})
+et des corrélations d'événements. \caimp{} propose une intégration optionnelle
+avec Splunk comme source de métriques secondaire, permettant aux organisations
+déjà équipées de Splunk de bénéficier de l'IA explicative de \caimp{}.
+
+\subsection{Alternatives open source : SigNoz, Netdata, Zabbix, Nagios}
+
+\begin{description}[leftmargin=2cm]
+  \item[SigNoz] Alternative open source à Datadog construite sur ClickHouse,
+    supportant métriques, traces et journaux. Bonne interface, mais pas d'IA
+    explicative.
+  \item[Netdata] Monitoring temps réel à très faible latence, orienté serveur
+    individuel, sans analyse multi-tenant.
+  \item[Zabbix] Plateforme mature (depuis 2001) aux capacités étendues mais à
+    la courbe d'apprentissage très abrupte ; pas d'IA native.
+  \item[Nagios] Pionnier du monitoring (1999), aujourd'hui techniquement vieilli ;
+    approche purement par seuils statiques.
+\end{description}
+
+\section{Tableau comparatif}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison des solutions de supervision selon 12 critères}
+\label{tab:comparaison-solutions}
+\small
+\begin{tabularx}{\textwidth}{lXXXXXX}
+\toprule
+\textbf{Critère} & \textbf{Datadog} & \textbf{Grafana/Prom.} & \textbf{Dynatrace}
+  & \textbf{SigNoz} & \textbf{Zabbix} & \textbf{\caimp{}} \\
+\midrule
+Prix (mois/hôte)  & 15--31~\$ & Gratuit    & 69~\$    & Gratuit     & Gratuit    & Gratuit \\
+On-premise        & Non        & Oui        & Non      & Oui         & Oui        & Oui \\
+IA native         & Partielle  & Non        & Avancée  & Non         & Non        & Oui \\
+LLM explicatif    & Non        & Non        & Non      & Non         & Non        & \textbf{Oui} \\
+RAG + runbooks    & Non        & Non        & Non      & Non         & Non        & \textbf{Oui} \\
+Corrélation chang.& Non        & Non        & Partielle& Non         & Non        & \textbf{Oui} \\
+Prévision 24h     & Oui        & Non        & Oui      & Non         & Non        & \textbf{Oui} \\
+Dédup. alertes    & Oui        & Via AM     & Oui      & Partielle   & Non        & Oui \\
+Multi-tenant      & Oui        & Limite     & Oui      & Oui         & Oui        & Oui \\
+Déploiement \textless 10 min & Non & Non   & Non      & Non         & Non        & \textbf{Oui} \\
+Dashboard answers-first & Non & Non        & Partielle& Non         & Non        & \textbf{Oui} \\
+Tableau de bord   & Excellent  & Excellent  & Bon      & Correct     & Vieilli    & Moderne \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Techniques de détection d'anomalies}
+
+\subsection{Détection par seuil statique}
+
+La détection par seuil est la méthode la plus simple : une alerte est déclenchée
+quand une valeur dépasse un seuil prédéfini. Sa simplicité est un atout, mais elle
+présente deux défauts majeurs : elle génère des faux positifs pour les systèmes à
+charge variable et ne s'adapte pas au comportement normal évolué d'un système.
+
+\caimp{} implémente cette méthode comme premier filtre rapide, avec des seuils
+configurables par variable d'environnement.
+
+\subsection{Score Z et détection statistique}
+
+Le Z-score mesure l'écart d'une observation à la moyenne en unités d'écart-type :
+
+\begin{equation}
+  z = \frac{x - \mu}{\sigma}
+  \label{eq:zscore}
+\end{equation}
+
+où $\mu$ est la moyenne empirique calculée sur une fenêtre historique et $\sigma$
+l'écart-type. Une valeur $|z| > 3$ est considérée comme anormale dans la
+distribution normale standard (probabilité de 0,27~\%). Cette méthode s'adapte
+automatiquement au comportement normal du système.
+
+\subsection{Détection par taux de variation}
+
+Cette méthode calcule la dérivée discrète de la série temporelle :
+
+\begin{equation}
+  \Delta_t = \frac{x_t - x_{t-1}}{x_{t-1}} \times 100\%
+  \label{eq:rateofchange}
+\end{equation}
+
+Elle est particulièrement efficace pour détecter les saturations rapides (montée
+soudaine du CPU lors d'un \textit{fork bomb}) que le Z-score pourrait manquer
+sur une fenêtre historique longue.
+
+\subsection{Forêt d'isolation (Isolation Forest)}
+
+L'Isolation Forest \cite{liu2008isolation} est un algorithme non supervisé basé
+sur la construction d'arbres de décision aléatoires. Son principe : les observations
+aberrantes sont plus facilement \textit{isolées} par des partitions aléatoires.
+Le score d'anomalie est inversement proportionnel à la profondeur moyenne
+d'isolation. Bien que non implémenté dans \caimp{} v2, cet algorithme est
+pressenti pour les versions futures.
+
+\subsection{Lissage exponentiel de Holt-Winters}
+
+La méthode de Holt-Winters \cite{holt1957forecasting, winters1960forecasting}
+(ou double lissage exponentiel linéaire) modélise une série temporelle comme la
+somme d'un niveau et d'une tendance linéaire :
+
+\begin{align}
+  L_t &= \alpha x_t + (1-\alpha)(L_{t-1} + T_{t-1}) \label{eq:hw_level} \\
+  T_t &= \beta(L_t - L_{t-1}) + (1-\beta)T_{t-1}   \label{eq:hw_trend} \\
+  \hat{x}_{t+h} &= L_t + h \cdot T_t               \label{eq:hw_forecast}
+\end{align}
+
+où :
+\begin{itemize}
+  \item $L_t$ est le niveau lissé au temps $t$ ;
+  \item $T_t$ est la tendance lissée au temps $t$ ;
+  \item $\alpha \in [0,1]$ est le paramètre de lissage du niveau ;
+  \item $\beta \in [0,1]$ est le paramètre de lissage de la tendance ;
+  \item $\hat{x}_{t+h}$ est la prévision à $h$ pas dans le futur.
+\end{itemize}
+
+Dans \caimp{}, les paramètres retenus sont $\alpha = 0.3$ et $\beta = 0.1$,
+favorisant un lissage modéré qui réagit aux tendances sans amplifier le bruit.
+Les intervalles de confiance sont calculés à $\pm 1.28 \sigma$ des résidus
+(couverture approximative de 80~\%).
+
+\section{Modèles de langage pour l'AIOps}
+
+\subsection{Panorama des LLM ouverts}
+
+L'émergence des modèles de langage à grande échelle (\textsc{llm}) ouverts a ouvert
+une nouvelle dimension dans l'\textsc{aiops} : l'explication en langage naturel
+des incidents. Parmi les modèles les plus pertinents pour une exécution locale :
+
+\begin{description}[leftmargin=2cm]
+  \item[Llama 3.1 8B] Le modèle retenu par \caimp{}. Publié par Meta AI en 2024
+    \cite{llama3_meta2024}, il offre un excellent rapport qualité/performance en
+    version quantifiée Q4\_K\_M : 5~Go de VRAM, latence inférieure à 2 secondes
+    par requête sur du matériel courant.
+  \item[Mistral 7B] Comparable à Llama 3 en termes de performance, avec une
+    fenêtre de contexte étendue de 32K tokens.
+  \item[Phi-3 Mini (3.8B)] Modèle compact de Microsoft, excellent pour l'inférence
+    sur des machines à ressources limitées.
+  \item[Gemma 7B] Modèle de Google, performant mais moins bien aligné pour les
+    tâches opérationnelles.
+\end{description}
+
+\subsection{Quantification des modèles}
+
+La quantification consiste à réduire la précision numérique des poids d'un modèle
+(de float32 à int4, par exemple) pour diminuer son empreinte mémoire tout en
+conservant une qualité d'inférence acceptable \cite{dettmers2022quantization}.
+Le format \textsc{gguf} utilisé par Ollama permet la quantification
+Q4\_K\_M (4 bits, méthode K-means) qui réduit la taille de Llama 3.1 8B de 16~Go
+(float16) à environ 4.7~Go, rendant possible l'exécution sur un serveur standard.
+
+\subsection{Le pattern RAG (Retrieval-Augmented Generation)}
+
+Le \textsc{rag} \cite{lewis2020rag} est une technique d'augmentation du contexte
+d'un \textsc{llm} par la récupération dynamique de documents pertinents depuis une
+base de connaissances. Le schéma de fonctionnement est le suivant :
+
+\begin{enumerate}
+  \item L'\textbf{indexation} : les documents (runbooks, incidents passés) sont
+    convertis en vecteurs d'embedding via un modèle dédié (\texttt{nomic-embed-text})
+    et stockés dans une base vectorielle (pgvector \cite{pgvector2021}).
+  \item La \textbf{recherche} : lors d'un incident, un vecteur est calculé pour
+    le contexte de l'anomalie, et les $k$ documents les plus similaires sont
+    récupérés par recherche de voisins approximatifs (cosine similarity).
+  \item L'\textbf{augmentation} : les documents récupérés sont injectés dans le
+    prompt du \textsc{llm} pour enrichir son contexte avant génération.
+\end{enumerate}
+
+Ce pattern permet à un \textsc{llm} à connaissance générale de s'adapter
+spécifiquement au contexte d'une organisation, sans \textit{fine-tuning}
+coûteux.
+
+\section{Positionnement de CAIMP}
+
+L'analyse de l'état de l'art fait apparaître un espace vacant entre les solutions
+commerciales onéreuses (Datadog, Dynatrace) et les outils open source sans IA
+(Grafana/Prometheus). Cet espace est celui des \textit{petites équipes} cherchant
+une plateforme auto-hébergée, explicative et accessible.
+
+\caimp{} se positionne sur cet espace avec les différenciants suivants :
+
+\begin{itemize}
+  \item \textbf{Explication en langage naturel} via un \textsc{llm} local (aucun
+    outil open source ne propose cela) ;
+  \item \textbf{Corrélation automatique des changements} (absente de toutes les
+    solutions open source comparées) ;
+  \item \textbf{Architecture événementielle moderne} avec NATS JetStream
+    (plus légère que Kafka pour ce cas d'usage) ;
+  \item \textbf{Déploiement en 10 minutes} sur n'importe quelle machine.
+\end{itemize}
+
+\section*{Conclusion}
+
+L'état de l'art révèle que si les outils de monitoring ne manquent pas, aucun ne
+combine simultanément l'auto-hébergement, l'accessibilité pour les non-experts
+et l'explication en langage naturel par \textsc{llm} local. Cette lacune justifie
+pleinement la création de \caimp{}. Le chapitre suivant traduit ces constats en
+spécifications fonctionnelles et non fonctionnelles concrètes.

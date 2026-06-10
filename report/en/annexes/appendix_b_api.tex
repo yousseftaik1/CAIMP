@@ -1,0 +1,61 @@
+\chapter{API Endpoint Reference}
+
+\section{Admin API (port 8001)}
+
+\begin{longtable}{llp{4.5cm}p{3.5cm}}
+\toprule
+\textbf{Method} & \textbf{URL} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+POST   & \texttt{/auth/login}              & JWT authentication        & None \\
+POST   & \texttt{/auth/refresh}            & Token renewal             & Refresh token \\
+POST   & \texttt{/auth/logout}             & Token revocation          & JWT \\
+GET    & \texttt{/admin/users}             & List users                & JWT (admin) \\
+POST   & \texttt{/admin/users}             & Create user               & JWT (admin) \\
+DELETE & \texttt{/admin/users/\{id\}}      & Delete user               & JWT (admin) \\
+GET    & \texttt{/admin/servers}           & List servers              & JWT \\
+POST   & \texttt{/admin/servers}           & Register server           & JWT (admin) \\
+POST   & \texttt{/admin/servers/\{id\}/enroll} & Generate enrollment token & JWT (admin) \\
+\end{longtable}
+
+\section{Query API (port 8002)}
+
+\begin{longtable}{llp{4.5cm}p{3.5cm}}
+\toprule
+\textbf{Method} & \textbf{URL} & \textbf{Description} & \textbf{Cache} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+GET  & \texttt{/api/v1/dashboard/summary}       & Answers-first view        & 30s \\
+GET  & \texttt{/api/v1/servers}                 & Server list               & 60s \\
+GET  & \texttt{/api/v1/servers/\{id\}/summary}  & Live CPU/RAM/Disk summary & 30s \\
+GET  & \texttt{/api/v1/metrics}                 & Historical metrics        & 30s \\
+GET  & \texttt{/api/v1/anomalies}               & Anomaly event list        & None \\
+GET  & \texttt{/api/v1/ai/explanations}         & AI explanations           & None \\
+GET  & \texttt{/api/v1/forecasts}               & Holt-Winters forecasts    & 60s \\
+GET  & \texttt{/api/v1/incidents}               & Splunk incidents          & None \\
+POST & \texttt{/api/v1/incidents/\{id\}/feedback} & Thumbs-up/down rating   & — \\
+GET  & \texttt{/api/v1/runbooks}                & Runbook list              & None \\
+POST & \texttt{/api/v1/runbooks}                & Create runbook + embed    & — \\
+PUT  & \texttt{/api/v1/runbooks/\{id\}}         & Update runbook            & — \\
+DELETE & \texttt{/api/v1/runbooks/\{id\}}       & Delete runbook            & — \\
+GET  & \texttt{/api/v1/reports/pdf}             & Download PDF report       & — \\
+\end{longtable}
+
+\section{Change Tracker (port 8011)}
+
+\begin{longtable}{llp{5cm}p{3cm}}
+\toprule
+\textbf{Method} & \textbf{URL} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+POST & \texttt{/ingest}            & Generic change event (agent) & JWT \\
+POST & \texttt{/ingest/docker}     & Docker event (agent)         & JWT \\
+POST & \texttt{/webhooks/github}   & GitHub webhook               & HMAC \\
+POST & \texttt{/webhooks/gitlab}   & GitLab webhook               & Token \\
+\end{longtable}

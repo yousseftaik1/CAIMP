@@ -1,0 +1,141 @@
+\chapter{Testing and Validation}
+
+\section*{Introduction}
+
+An infrastructure monitoring platform must itself be verifiable and reliable.
+This chapter presents the testing strategy adopted for \caimp{}, the results of
+unit, integration and load tests, and the traceability matrix demonstrating
+functional requirement coverage.
+
+\section{Testing Strategy: The Pyramid}
+
+\caimp{}'s testing strategy follows the classic pyramid, with particular emphasis
+on integration tests given the distributed nature of the system.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \fill[NavyBlue!15, draw=NavyBlue, thick]
+    (0,0) -- (6,0) -- (3,4) -- cycle;
+  \fill[TealBlue!20, draw=TealBlue, thick]
+    (0.8,0) -- (5.2,0) -- (4.0,2.0) -- (2.0,2.0) -- cycle;
+  \fill[SuccessGreen!20, draw=SuccessGreen, thick]
+    (1.6,0) -- (4.4,0) -- (3.6,1.3) -- (2.4,1.3) -- cycle;
+  \node[font=\small\bfseries\color{NavyBlue}]     at (3, 3.2) {E2E / Smoke};
+  \node[font=\small\bfseries\color{TealBlue}]     at (3, 1.7) {Integration};
+  \node[font=\small\bfseries\color{SuccessGreen}] at (3, 0.65) {Unit};
+\end{tikzpicture}
+\caption{Testing pyramid for \caimp{}}
+\label{fig:pyramid}
+\end{figure}
+
+\section{Unit Tests}
+
+Unit tests cover the critical algorithms that can be tested without external
+dependencies: anomaly detectors, Holt-Winters engine, change correlation scoring
+function, and LLM output validator.
+
+\begin{lstlisting}[language=Python, caption={Unit tests for the Holt-Winters engine}]
+class TestHoltWinters:
+    def test_stable_series_no_trend(self):
+        """Constant series → zero trend, stable forecasts."""
+        values = [0.5] * 48
+        result = forecast_metric(values, 24, critical_threshold=0.9)
+        assert abs(result.trend_slope) < 0.001
+        assert all(abs(p["predicted"] - 0.5) < 0.01 for p in result.points)
+
+    def test_rising_series_detects_critical(self):
+        """Strongly rising series → time_to_critical is not None."""
+        values = [0.5 + 0.01 * i for i in range(48)]  # +1%/h
+        result = forecast_metric(values, 24, critical_threshold=0.9)
+        assert result.time_to_critical is not None
+        assert result.time_to_critical < 24
+
+    def test_confidence_high_for_large_history(self):
+        """48+ data points → confidence = 'high'."""
+        result = forecast_metric([0.5] * 50, 24, 0.9)
+        assert result.confidence == "high"
+\end{lstlisting}
+
+\section{Integration Tests}
+
+The smoke test script (\texttt{scripts/smoke\_test\_splunk.py}) implements an
+end-to-end test in 7 steps: health checks, authentication, anomaly webhook,
+pipeline polling (until \texttt{status = "complete"}), field validation, incident
+stats, and runbook CRUD.
+
+\section{Load Tests}
+
+Load test results at 1,000 metrics/second on an 8-core / 16\,GB machine:
+
+\begin{table}[H]
+\centering
+\caption{Load test results at 1,000 metrics/second}
+\label{tab:load-test}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Metric} & \textbf{Measured} & \textbf{Target} \\
+\midrule
+Ingestion latency p50  & 12 ms   & $<$50 ms \\
+Ingestion latency p99  & 43 ms   & $<$50 ms \\
+Sustained throughput   & 1,180 msg/s & $\geq$1,000 msg/s \\
+CPU usage (TW)        & 34\%    & $<$70\% \\
+RAM usage (TW)        & 18 MB   & $<$128 MB \\
+NATS message loss     & 0       & 0 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+All performance objectives defined in Chapter 3 are met.
+
+\section{Security Tests}
+
+\begin{table}[H]
+\centering
+\caption{Security tests performed}
+\label{tab:security-tests}
+\small
+\begin{tabularx}{\textwidth}{lXl}
+\toprule
+\textbf{Test} & \textbf{Method} & \textbf{Result} \\
+\midrule
+SQL injection    & OWASP Top 10 payloads in all text fields & Blocked (parameterised asyncpg) \\
+Expired JWT      & Token older than 15 minutes             & HTTP 401 \\
+Forged JWT       & Payload modification without re-signing  & HTTP 401 \\
+Cross-tenant     & Request with another org's org\_id       & HTTP 404 (RLS) \\
+Agent no cert    & OTLP connection without mTLS cert        & TLS handshake failure \\
+Revoked cert     & Agent cert in revoked\_agents            & Connection refused \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Traceability Matrix}
+
+\begin{table}[H]
+\centering
+\caption{Functional requirement—test coverage traceability matrix}
+\label{tab:traceability-tests}
+\small
+\begin{tabularx}{\textwidth}{lXll}
+\toprule
+\textbf{FR} & \textbf{Requirement} & \textbf{Test type} & \textbf{Status} \\
+\midrule
+FR1  & OTLP collection           & Integration (smoke step 1) & \textcolor{SuccessGreen}{OK} \\
+FR6  & 3-algorithm detection     & Unit + Integration          & \textcolor{SuccessGreen}{OK} \\
+FR10 & AI explanation            & Integration (smoke step 4)  & \textcolor{SuccessGreen}{OK} \\
+FR12 & Change correlation        & Unit (scoring)              & \textcolor{SuccessGreen}{OK} \\
+FR14 & Time to critical          & Unit (HW test)              & \textcolor{SuccessGreen}{OK} \\
+FR15 & Alert deduplication       & Integration (Redis NX)      & \textcolor{SuccessGreen}{OK} \\
+FR17 & Answers-first dashboard   & Integration (endpoint)      & \textcolor{SuccessGreen}{OK} \\
+FR18 & Runbook CRUD              & Integration (smoke step 7)  & \textcolor{SuccessGreen}{OK} \\
+FR24 & Multi-tenant isolation    & Security (cross-tenant)     & \textcolor{SuccessGreen}{OK} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Conclusion}
+
+All tests — unit, integration, load, and security — demonstrate the platform's
+robustness. Performance targets are met and the principal security vulnerabilities
+are covered. The next chapter describes the deployment procedures for putting
+the platform into production.

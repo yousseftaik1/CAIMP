@@ -1,0 +1,200 @@
+% ============================================================================
+% Chapitre 1 — Contexte général et cadre du projet
+% ============================================================================
+\chapter{Contexte général et cadre du projet}
+
+\section*{Introduction}
+
+Ce premier chapitre pose le cadre conceptuel du projet \caimp{}.
+Nous décrivons l'environnement technologique de l'observabilité moderne et du
+domaine des \textsc{aiops}, puis nous formulons la problématique de manière précise
+en appui sur des données chiffrées issues de sources industrielles et académiques.
+
+\section{Observabilité moderne des systèmes informatiques}
+
+\subsection{Les trois piliers de l'observabilité}
+
+L'observabilité désigne la capacité à inférer l'état interne d'un système à partir
+de ses sorties externes \cite{brendangregg2020}. Dans le domaine de l'informatique
+distribuée, elle repose traditionnellement sur trois piliers complémentaires :
+
+\begin{description}[leftmargin=2cm, style=nextline]
+  \item[Les métriques (\textit{metrics})] Des mesures numériques périodiques sur
+    l'état du système : usage du \textsc{cpu}, occupation mémoire, taux de requêtes,
+    latence. Leur collecte est légère et leur analyse statistique permet la détection
+    d'anomalies et la prévision des tendances.
+
+  \item[Les journaux (\textit{logs})] Des enregistrements textuels d'événements
+    discrets : erreurs d'application, requêtes \textsc{http}, démarrages de service.
+    Riches en information contextuelle, ils sont indispensables au diagnostic post
+    mortem mais difficiles à analyser à grande échelle sans outillage adapté.
+
+  \item[Les traces (\textit{traces})] Des représentations du parcours d'une requête
+    à travers les différents composants d'un système distribué. Elles permettent de
+    localiser les goulots d'étranglement et d'identifier les dépendances entre
+    services \cite{sigelman2010dapper}.
+\end{description}
+
+Le protocole \textsc{otlp} (\textit{OpenTelemetry Protocol}) \cite{otlp_spec},
+standardisé par la CNCF, unifie la collecte de ces trois types de signaux sous
+un format commun, facilitant l'interopérabilité entre les outils d'instrumentation
+et les \textit{backends} d'analyse.
+
+\subsection{De la supervision réactive à la supervision prédictive}
+
+Les premières générations d'outils de monitoring, comme Nagios ou Zabbix, adoptaient
+une approche purement réactive : envoyer une alerte quand un seuil est dépassé.
+Cette philosophie présentait deux limitations majeures. D'une part, les seuils
+statiques génèrent une proportion significative de faux positifs et de faux négatifs
+sur des systèmes à charge variable. D'autre part, l'alerte ne transmet aucune
+information sur la \textit{cause} du problème.
+
+L'émergence de bases de données temporelles hautement performantes comme
+TimescaleDB \cite{timescaledb2017} et de techniques statistiques de détection
+d'anomalies (\textit{Z-score}, \textit{Isolation Forest} \cite{liu2008isolation},
+\textit{Holt-Winters} \cite{winters1960forecasting}) a permis de passer à un
+paradigme proactif : détecter une dérive avant qu'elle ne devienne un incident,
+et anticiper les saturations futures.
+
+\section{Le domaine de l'AIOps}
+
+\subsection{Définition et périmètre}
+
+L'\textsc{aiops} (\textit{Artificial Intelligence for IT Operations}) désigne
+l'application des techniques d'apprentissage automatique et d'intelligence
+artificielle aux opérations informatiques \cite{gartner_aiops2021}. Gartner, qui
+a forgé le terme en 2017, le définit comme «~une plateforme qui combine le Big
+Data, l'apprentissage automatique et les technologies analytiques avancées pour
+améliorer et automatiser directement les opérations informatiques~».
+
+Les domaines couverts par l'\textsc{aiops} incluent :
+
+\begin{itemize}
+  \item La corrélation automatique d'événements et d'alertes ;
+  \item La détection d'anomalies sans règles prédéfinies (\textit{unsupervised}) ;
+  \item L'analyse de la cause racine (\textsc{rca}) et la suggestion de remédiation ;
+  \item La prévision de capacité et la gestion prédictive des incidents ;
+  \item L'automatisation des actions de remédiation (\textit{runbooks} automatisés).
+\end{itemize}
+
+\subsection{Évolution historique}
+
+L'émergence de l'\textsc{aiops} s'inscrit dans une évolution continue des pratiques
+opérationnelles. Les grandes étapes sont les suivantes :
+
+\begin{enumerate}
+  \item \textbf{Années 1990--2000 : supervision par seuils statiques} (Nagios, MRTG).
+    Règles manuelles, alertes binaires, forte dépendance à l'expertise humaine.
+  \item \textbf{Années 2000--2010 : agrégation de journaux et métriques} (Splunk,
+    Graphite, Ganglia). Centralisation des données mais analyse encore manuelle.
+  \item \textbf{Années 2010--2018 : observabilité distribuée} (Prometheus, Grafana,
+    Jaeger, Zipkin). Instrumentation des architectures microservices, premières
+    détections d'anomalies statistiques.
+  \item \textbf{Années 2018--2023 : \textsc{aiops} émergent} (Dynatrace Davis,
+    Datadog Watchdog). Algorithmes ML intégrés dans les plateformes commerciales,
+    corrélation automatique d'anomalies.
+  \item \textbf{2023--present : \textsc{aiops} générative} (\textsc{llm} locaux,
+    RAG). Explosion des modèles de langage ouverts permettant l'explication en
+    langage naturel sans dépendance cloud.
+\end{enumerate}
+
+\section{Problématique}
+
+\subsection{La fatigue d'alertes : un phénomène documenté}
+
+Les études industrielles convergent pour identifier la \textit{fatigue d'alertes}
+comme l'un des défis opérationnels les plus critiques. Selon le rapport PagerDuty
+2023 \cite{pagerduty2023} :
+
+\begin{itemize}
+  \item 73~\% des ingénieurs déclarent ignorer régulièrement des alertes en raison
+    de leur volume excessif ;
+  \item 40~\% des alertes sont des faux positifs ou des doublons ;
+  \item Le \textsc{mttr} moyen est de 4 heures 20 minutes pour les organisations
+    sans outillage \textsc{aiops}, contre 42 minutes pour celles qui l'ont adopté.
+\end{itemize}
+
+\subsection{Le fossé entre détection et compréhension}
+
+La réponse standard à une alerte « CPU à 98~\% » suit un protocole d'investigation
+implicite que tout ingénieur d'exploitation reconnaîtra :
+
+\begin{enumerate}
+  \item Vérifier les processus consommateurs (\texttt{top}, \texttt{htop}) ;
+  \item Consulter les journaux d'application (\texttt{journalctl}, \texttt{tail -f}) ;
+  \item Examiner l'historique des déploiements récents ;
+  \item Vérifier les requêtes base de données lentes ;
+  \item Consulter les métriques réseau pour écarter une attaque \textsc{ddos} ;
+  \item Croiser avec les événements système (\texttt{dmesg}, \texttt{auditd}).
+\end{enumerate}
+
+Cette séquence, répétée à 2h du matin lors d'une astreinte, est source d'erreurs
+et de stress. Elle suppose une expertise que les petites équipes n'ont pas
+systématiquement, et elle mobilise un temps précieux pendant lequel les utilisateurs
+subissent l'indisponibilité du service.
+
+\subsection{Le problème spécifique des petites équipes}
+
+Les solutions commerciales d'\textsc{aiops} sont conçues pour les grandes
+organisations. Datadog, New Relic ou Dynatrace proposent des tarifications à la
+donnée ou au \textit{host} qui représentent une charge financière prohibitive pour
+une startup ou une agence : entre 15 et 23~\$ par hôte et par mois pour les
+solutions de base, pouvant atteindre plusieurs milliers de dollars mensuels pour
+des fonctionnalités avancées.
+
+Par ailleurs, ces outils requièrent une expertise significative pour être
+correctement configurés, et leur courbe d'apprentissage décourage les équipes
+sans ingénieur \textsc{devops} dédié.
+
+\subsection{Formulation de la problématique}
+
+Cette analyse nous conduit à formuler la problématique centrale du projet :
+
+\begin{infobox}[Problématique]
+\textit{Comment concevoir une plateforme de supervision d'infrastructure auto-hébergée,
+accessible à des équipes sans expertise \textsc{devops}, capable non seulement de
+détecter les anomalies mais d'en expliquer la cause en langage naturel et de
+proposer des actions correctives concrètes, le tout sans dépendance à des services
+cloud tiers ?}
+\end{infobox}
+
+\section{Périmètre fonctionnel}
+
+\subsection{Ce qui est inclus}
+
+\begin{itemize}
+  \item Collecte de métriques \textsc{cpu}, mémoire et disque via un agent Python
+    léger et le protocole \textsc{otlp} ;
+  \item Détection d'anomalies par trois algorithmes (seuil statique, Z-score,
+    taux de variation) ;
+  \item Analyse de la cause racine par corrélation des changements récents et
+    appel à un \textsc{llm} local ;
+  \item Prévision sur 24 heures par lissage de Holt-Winters ;
+  \item Interface utilisateur orientée réponses avec tableau de bord synthétique ;
+  \item Déduplication d'alertes et détection de bursts ;
+  \item Rapports PDF lisibles par des non-techniciens ;
+  \item Intégration optionnelle avec Splunk Enterprise ;
+  \item Déploiement complet par Docker Compose ;
+  \item Authentification \textsc{jwt} et chiffrement \textsc{mtls} pour les agents.
+\end{itemize}
+
+\subsection{Ce qui est exclu}
+
+\begin{itemize}
+  \item Collecte de traces (\textit{distributed tracing}) : hors périmètre,
+    nécessiterait l'instrumentation des applications cibles ;
+  \item Remédiation automatisée (exécution automatique de corrections) :
+    les recommandations restent à la discrétion de l'opérateur ;
+  \item Support Windows pour l'agent : limité à Linux dans cette version ;
+  \item Interface mobile : la plateforme est optimisée pour navigateur de bureau ;
+  \item Authentification fédérée (\textsc{saml}, \textsc{oidc}) :
+    non implémentée dans le périmètre de ce projet.
+\end{itemize}
+
+\section*{Conclusion}
+
+Ce chapitre a défini le cadre conceptuel du projet \caimp{}, en ancrant la
+problématique dans les enjeux réels de la supervision moderne. L'analyse de la
+fatigue d'alertes et du fossé entre détection et compréhension justifie
+l'approche orientée \textsc{aiops} adoptée. Le chapitre suivant brosse un tableau
+comparatif des solutions existantes et positionne \caimp{} dans cet écosystème.

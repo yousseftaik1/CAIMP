@@ -1,0 +1,43 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\markboth{Abstract}{Abstract}
+
+\begin{infobox}[Abstract]
+Infrastructure monitoring is a strategic challenge for any organisation operating
+servers, from startups to large enterprises. Traditional monitoring tools such as
+Prometheus, Grafana or Datadog focus on displaying metrics, leaving engineers
+to interpret data and manually diagnose incidents. This approach generates
+significant \textit{alert fatigue} and substantially increases the mean time to
+resolution (\textsc{mttr}).
+
+This report presents \textbf{\caimp{}} (\textit{Centralized AI Monitoring Platform}),
+a self-hosted open-source platform that repositions infrastructure monitoring
+around an \textit{answers-first} philosophy: instead of displaying graphs,
+the dashboard directly answers the question ``\textit{Is anything broken,
+and if so, why?}''.
+
+The architecture is built on nineteen containerised microservices communicating
+via \textsc{nats} JetStream. A lightweight agent deployed on each monitored server
+collects system metrics via the \textsc{otlp} protocol and automatically reports
+environment changes (Git deployments, Docker events, package installations, SSH
+sessions). A change correlation engine links each detected anomaly to modifications
+that occurred in the thirty minutes preceding the incident, using a temporal
+proximity score, and submits the analysis to a local \textsc{llm}
+(Llama 3.1 8B via Ollama) to produce a natural-language explanation and concrete
+action recommendations.
+
+The forecasting engine applies Holt-Winters double exponential smoothing over the
+next 24 hours to anticipate resource saturation. An alert deduplication engine
+eliminates duplicates within a fifteen-minute window, reducing operational noise.
+The platform manages dozens of servers in a multi-tenant architecture with complete
+data isolation per organisation.
+
+Built in one month by a three-student team, the platform totals more than fifty
+thousand lines of code in Python 3.12, Go 1.22 and TypeScript, and can be
+installed in minutes via Docker Compose.
+\end{infobox}
+
+\medskip
+\textbf{Keywords:} AIOps, infrastructure monitoring, microservices,
+large language model, TimescaleDB, NATS JetStream, change correlation,
+anomaly detection, Holt-Winters, RAG, pgvector.

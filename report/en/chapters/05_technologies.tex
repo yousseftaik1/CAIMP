@@ -1,0 +1,106 @@
+\chapter{Technology Study}
+
+\section*{Introduction}
+
+Every technology integrated into \caimp{} was evaluated systematically:
+functional relevance, maturity, community support, memory footprint and
+coherence with the overall system. This chapter presents and justifies each choice.
+
+\section{Programming Languages}
+
+\textbf{Python 3.12} is used for all API services and background workers.
+Version 3.12 brings 10--15\% CPython performance improvements and enhanced
+error messages. The \texttt{async/await} pattern is used pervasively for
+I/O-bound services awaiting both NATS messages and Ollama responses.
+
+\textbf{Go 1.22} was chosen for the Telemetry Writer for its native concurrency
+model (goroutines + channels), ideal for parallel metric ingestion. The Go
+compiler produces a static binary, simplifying Docker packaging. A Go server
+starts in milliseconds and consumes less than 20\,MB RAM at rest.
+
+\textbf{TypeScript (React 18)} powers the frontend. Static typing prevents
+interface mismatch bugs across the numerous frontend-backend contracts in \caimp{}.
+
+\section{Backend Frameworks}
+
+\textbf{FastAPI} \cite{fastapi_docs} was selected over Flask (synchronous by
+default) and Django REST Framework (too heavy for microservices) for its automatic
+OpenAPI/Swagger documentation generation, Pydantic payload validation, native
+async/await support, and performance comparable to Node.js.
+
+\textbf{asyncpg} provides a native C-based asyncio PostgreSQL driver that is
+2--3x faster than psycopg2 via binary protocol and zero-copy read paths.
+
+\section{Database}
+
+\textbf{PostgreSQL 16 + TimescaleDB} \cite{postgresql16_doc, timescaledb2017}:
+\begin{itemize}
+  \item \textbf{Hypertables}: automatic time-based partitioning for \texttt{metrics}
+    and \texttt{change\_events} (7-day chunk intervals). Queries on time ranges
+    read only relevant chunks (\textit{chunk exclusion}).
+  \item \textbf{Columnar compression}: after 7 days, chunks are compressed in
+    columnar format. Average compression ratio for numeric metrics: 12:1.
+  \item \textbf{Retention policies}: automatic cleanup of old data chunks.
+\end{itemize}
+
+\textbf{pgvector} \cite{pgvector2021} adds \texttt{VECTOR(768)} columns and the
+HNSW index for approximate nearest-neighbour search with $O(\log n)$ complexity
+and sub-millisecond query latency.
+
+\textbf{Redis 7.2} is used for: alert deduplication (NX keys, 15-min TTL); API
+cache (30 seconds); live metric values from HEC Bridge (90-second TTL); JWT
+refresh token blacklist.
+
+\section{Artificial Intelligence}
+
+\textbf{Ollama} serves two models locally:
+\begin{itemize}
+  \item \texttt{llama3.1:8b-instruct-q4\_K\_M}: Q4\_K\_M quantisation reduces
+    from 16\,GB (fp16) to 4.7\,GB with $<$2\% quality degradation
+    \cite{dettmers2022quantization};
+  \item \texttt{nomic-embed-text} \cite{nomicembed2024}: 270\,MB embedding model
+    producing 768-dimensional vectors optimised for semantic search.
+\end{itemize}
+
+\subsection{Holt-Winters — Complete Mathematical Formulation}
+
+\begin{align}
+  L_0 &= x_1  \tag{level initialisation} \\
+  T_0 &= \frac{x_n - x_1}{n-1} \tag{trend initialisation} \\
+  L_t &= \alpha \cdot x_t + (1-\alpha)(L_{t-1} + T_{t-1}) \tag{level update} \\
+  T_t &= \beta(L_t - L_{t-1}) + (1-\beta)T_{t-1} \tag{trend update} \\
+  \hat{x}_{t+h} &= L_t + h \cdot T_t \tag{forecast at h steps ahead}
+\end{align}
+
+Confidence intervals at $\pm 1.28\sigma$ ($\approx$80\% coverage):
+$\hat{x}_{t+h} \pm 1.28 \cdot \hat{\sigma}_r$, where
+$\hat{\sigma}_r = \sqrt{\frac{1}{n}\sum r_t^2}$.
+Parameters: $\alpha = 0.3$, $\beta = 0.1$.
+
+\section{Infrastructure}
+
+\textbf{Docker + Docker Compose v2} \cite{docker_docs}: 19 services with
+healthchecks, dependency conditions, named volumes, and a bridge network
+(\texttt{caimp\_net}) isolating all services from external access except via Nginx.
+
+\textbf{NATS JetStream} \cite{nats_docs}: selected over Kafka (512\,MB + ZooKeeper)
+and RabbitMQ for its 30\,MB footprint, sub-ms latency, and simple configuration.
+
+\textbf{OTLP} \cite{otlp_spec}: CNCF standard for metrics/traces/logs transmission.
+Ensures future compatibility with other observability backends.
+
+\section{Security}
+
+\textbf{JWT} \cite{rfc7519}: HS256 algorithm, 64-byte secret, 15-minute access
+token expiry, 7-day refresh token, Redis blacklist.
+
+\textbf{mTLS} \cite{rfc8446}: ECDSA P-256 certificates issued by internal CA
+stored AES-256-GCM encrypted in PostgreSQL. Single-use enrollment tokens expire
+after 30 minutes. Revocation checked on every connection.
+
+\section*{Conclusion}
+
+The combination of Python/Go for the backend, TimescaleDB for time-series data,
+NATS for the event bus, and Ollama for local LLM inference constitutes a coherent,
+performant and accessible stack. The next chapter details the concrete
+implementation of these choices.

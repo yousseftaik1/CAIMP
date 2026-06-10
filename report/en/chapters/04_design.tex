@@ -1,0 +1,355 @@
+\chapter{Design and Architecture}
+
+\section*{Introduction}
+
+This chapter is the technical heart of the report. It describes the \caimp{}
+microservices architecture, data model, main processing flows and design decisions
+that guided development. Every architectural choice is justified against the
+alternatives evaluated.
+
+\section{Architectural Choice: Microservices vs. Monolith}
+
+The microservices architecture was selected for three decisive reasons:
+(1)~Holt-Winters forecasting and LLM inference are compute-intensive tasks that
+must not block the query APIs;
+(2)~the Go telemetry writer benefits from goroutines for concurrent ingestion
+without Python GIL limitations;
+(3)~future metric sources (Kubernetes, AWS CloudWatch) can be added as independent
+services without modifying existing ones.
+
+\begin{table}[H]
+\centering
+\caption{Monolith vs.\ microservices comparison for \caimp{}}
+\label{tab:arch-choice}
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Criterion} & \textbf{Modular Monolith} & \textbf{Microservices} \\
+\midrule
+Deployment       & Simple (one process)        & Complex (Docker Compose) \\
+Scalability      & Vertical only               & Horizontal per service \\
+Fault isolation  & One crash affects all       & Graceful degradation \\
+Mixed languages  & Impossible                  & Go + Python \\
+AI decoupling    & LLM in API process          & Dedicated worker \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Global Architecture}
+
+The platform comprises 19 containerised services organised into four functional
+layers:
+\begin{description}[leftmargin=2cm]
+  \item[Ingestion layer] Receives metrics from agents (\servicename{telemetry-writer},
+    \servicename{splunk-hec-bridge}) and changes (\servicename{change-tracker}).
+  \item[Event layer] NATS JetStream bus providing asynchronous communication.
+  \item[Processing layer] Consumer services processing events independently.
+  \item[Presentation layer] REST APIs, WebSocket Gateway and React frontend.
+\end{description}
+
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  svc/.style   = {draw=NavyBlue,    fill=NavyBlue!10,     rounded corners=4pt,
+                  minimum width=3.2cm, minimum height=0.9cm,
+                  font=\normalsize\bfseries, align=center},
+  agent/.style = {draw=SuccessGreen, fill=SuccessGreen!12, rounded corners=4pt,
+                  minimum width=3.2cm, minimum height=0.9cm,
+                  font=\normalsize\bfseries, align=center},
+  store/.style = {draw=TealBlue,    fill=TealBlue!10,     rounded corners=4pt,
+                  minimum width=3.4cm, minimum height=0.9cm,
+                  font=\normalsize\bfseries, align=center},
+  bus/.style   = {draw=AccentOrange, fill=AccentOrange!12, rounded corners=6pt,
+                  minimum width=15.0cm, minimum height=1.0cm,
+                  font=\large\bfseries, align=center,
+                  text=AccentOrange!80!black},
+  proxy/.style = {draw=DarkGray!70, fill=DarkGray!10,     rounded corners=4pt,
+                  minimum width=15.0cm, minimum height=0.9cm,
+                  font=\large\bfseries, align=center},
+  layer/.style = {font=\small\bfseries\color{NavyBlue!70},
+                  anchor=west, inner sep=0},
+  arr/.style   = {-{Stealth[length=6pt]}, thick, draw=NavyBlue!60},
+  darr/.style  = {-{Stealth[length=6pt]}, thick, draw=NavyBlue!35, dashed},
+]
+\begin{scope}[on background layer]
+  \fill[SuccessGreen!6,  rounded corners=5pt] (-2.4, 8.9) rectangle (13.8, 10.1);
+  \fill[NavyBlue!5,      rounded corners=5pt] (-2.4, 7.4) rectangle (13.8,  8.8);
+  \fill[AccentOrange!6,  rounded corners=5pt] (-2.4, 5.9) rectangle (13.8,  7.3);
+  \fill[NavyBlue!5,      rounded corners=5pt] (-2.4, 4.4) rectangle (13.8,  5.8);
+  \fill[TealBlue!5,      rounded corners=5pt] (-2.4, 2.9) rectangle (13.8,  4.3);
+  \fill[NavyBlue!5,      rounded corners=5pt] (-2.4, 1.4) rectangle (13.8,  2.8);
+  \fill[DarkGray!6,      rounded corners=5pt] (-2.4, 0.1) rectangle (13.8,  1.3);
+\end{scope}
+% Layer labels
+\node[layer] at (-2.3, 9.5)  {Servers};
+\node[layer] at (-2.3, 8.1)  {Ingestion};
+\node[layer] at (-2.3, 6.6)  {Bus};
+\node[layer] at (-2.3, 5.1)  {Processing};
+\node[layer] at (-2.3, 3.6)  {Data};
+\node[layer] at (-2.3, 2.1)  {Presentation};
+\node[layer] at (-2.3, 0.7)  {Access};
+% Row 1 — Monitored servers
+\node[agent] (a1) at (1.6,  9.5) {Server A};
+\node[agent] (a2) at (5.6,  9.5) {Server B};
+\node[agent] (a3) at (9.6,  9.5) {Server C};
+% Row 2 — Ingestion services
+\node[svc] (tw)  at (1.6,  8.1) {Telemetry Writer};
+\node[svc] (hec) at (5.6,  8.1) {HEC Bridge};
+\node[svc] (ct)  at (9.6,  8.1) {Change Tracker};
+% Row 3 — NATS event bus
+\node[bus] (nats) at (5.7, 6.6) {NATS JetStream};
+% Row 4 — Worker services
+\node[svc] (aiw) at (0.8,  5.1) {AI Worker};
+\node[svc] (ale) at (3.8,  5.1) {Alert Engine};
+\node[svc] (fce) at (7.0,  5.1) {Forecast Engine};
+\node[svc] (cor) at (10.5, 5.1) {Correlation Engine};
+% Row 5 — Data stores
+\node[store] (pg)    at (2.4,  3.6) {PostgreSQL};
+\node[store] (redis) at (6.2,  3.6) {Redis :6379};
+\node[store] (oll)   at (10.5, 3.6) {Ollama :11434};
+% Row 6 — APIs and Frontend
+\node[svc] (fe)   at (0.8,  2.1) {Frontend :3000};
+\node[svc] (qapi) at (3.8,  2.1) {Query API :8002};
+\node[svc] (adm)  at (7.0,  2.1) {Admin API :8001};
+\node[svc] (wsg)  at (10.5, 2.1) {WS Gateway};
+% Row 7 — Reverse proxy
+\node[proxy] (nginx) at (5.7, 0.7) {Nginx --- Reverse Proxy :80 / :443};
+% Arrows — Servers → Ingestion
+\draw[arr] (a1) -- (tw);
+\draw[arr] (a2) -- (hec);
+\draw[arr] (a3) -- (ct);
+% Arrows — Ingestion → NATS
+\draw[arr] (tw)  -- (nats);
+\draw[arr] (hec) -- (nats);
+\draw[arr] (ct)  -- (nats);
+% Arrows — NATS → Workers
+\draw[arr] (nats.south) -- (aiw.north);
+\draw[arr] (nats.south) -- (ale.north);
+\draw[arr] (nats.south) -- (fce.north);
+\draw[arr] (nats.south) -- (cor.north);
+% Arrows — Workers → Data
+\draw[arr] (aiw.south) -- (pg.north);
+\draw[arr] (ale.south) -- (redis.north);
+\draw[arr] (fce.south) -- (pg.north);
+\draw[arr] (cor.south) -- (oll.north);
+\draw[darr] (aiw.south) to[out=-70, in=110] (oll.north);
+% Arrows — Data → Presentation
+\draw[arr]  (pg.south) -- (qapi.north);
+\draw[arr]  (pg.south) to[out=-110, in=90] (fe.north);
+\draw[arr]  (pg.south) to[out=-80,  in=90] (adm.north);
+\draw[darr] (nats.south) to[out=-5, in=90] (wsg.north);
+% Arrows — Presentation → Nginx
+\draw[arr] (fe.south)   -- (nginx.north);
+\draw[arr] (qapi.south) -- (nginx.north);
+\draw[arr] (adm.south)  -- (nginx.north);
+\draw[arr] (wsg.south)  -- (nginx.north);
+\end{tikzpicture}
+}%
+\caption{Global architecture of the \caimp{} platform --- 7 layers, 19 services}
+\label{fig:arch}
+\end{figure}
+\end{landscape}
+
+\section{How the Architecture Works — End-to-End Flows}
+
+Figure~\ref{fig:arch} shows the static structure of the platform. This section
+describes its dynamic behaviour: how data travels through each layer, from
+collection on the monitored server to a natural-language explanation appearing
+in the operator's browser.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Flow 1 — Metric Collection and Ingestion}
+
+The \caimp{} agent is a Python daemon deployed on each target server. Every
+15 seconds it reads system indicators (CPU, memory, disk) via \texttt{psutil},
+encodes them as \textsc{otlp}/HTTP (protobuf), and sends them to the
+\servicename{Telemetry Writer} (port 4318). This Go service:
+
+\begin{enumerate}
+  \item \textbf{Receives} the OTLP batch and extracts metric data points;
+  \item \textbf{Persists} the values to the \texttt{metrics} hypertable
+        (TimescaleDB) via a bulk \texttt{COPY} insert;
+  \item \textbf{Detects} anomalies in parallel using three algorithms
+        (static threshold, Z-score, rate of change);
+  \item \textbf{Publishes} each anomaly on the NATS subject
+        \texttt{anomaly.detected.\{org\_id\}.\{severity\}}.
+\end{enumerate}
+
+In parallel, the agent runs four \textit{change reporters} that continuously
+watch Docker events, package installations, SSH sessions and cron jobs. These
+events are sent to the \servicename{Change Tracker} (port 8011), which stores
+them in \texttt{change\_events} and publishes them on \texttt{change.detected.>}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Flow 2 — AI Explanation and Change Correlation}
+
+As soon as an \texttt{anomaly.detected.*} message arrives on the NATS bus,
+\textbf{two independent consumer services} wake up:
+
+\paragraph{AI Worker} For each anomaly it:
+\begin{enumerate}
+  \item Queries PostgreSQL for the last 30 minutes of metric history;
+  \item Queries pgvector by cosine similarity to retrieve the most similar
+        runbooks and past incidents (\textit{Retrieval-Augmented Generation, \rag{}});
+  \item Builds a structured prompt targeting non-DevOps developers and sends
+        it to Ollama (Llama 3.1 8B \textsc{llm});
+  \item Validates the JSON response, inserts it into \texttt{ai\_explanations},
+        then publishes \texttt{ai.explanation.ready.*} on NATS.
+\end{enumerate}
+
+\paragraph{Correlation Engine} In parallel it performs causal analysis:
+\begin{enumerate}
+  \item Queries \texttt{change\_events} in the window $[t-30\text{min},\,t]$
+        for the same server;
+  \item Scores each candidate change:
+        $s = e^{-0.1 \cdot \Delta t} \times w_{\text{type}}$
+        (temporal decay $\times$ change-type weight);
+  \item Sends the top 3 candidates to Ollama for a causal narrative;
+  \item Persists the result in \texttt{root\_cause\_analyses} and publishes
+        \texttt{rootcause.ready.*} on NATS.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Flow 3 — Resource Forecasting}
+
+The \servicename{Forecast Engine} runs autonomously on two periodic loops:
+
+\begin{description}[leftmargin=2cm]
+  \item[Forecast loop (every 30 min)] For each server/metric pair, fetches the
+    last 6 hours of data, applies Holt-Winters double exponential smoothing,
+    generates 24 hourly forecast points with $\pm 1.28\sigma$ confidence
+    intervals, computes \textit{time-to-critical}, requests an LLM narrative
+    from Ollama, and persists everything in \texttt{server\_forecasts}.
+  \item[Evaluation loop (every 60 min)] Compares past forecasts against actual
+    values, stores the mean absolute error (\textsc{mae}), and feeds historical
+    accuracy into the next LLM prompt to calibrate expressed confidence.
+\end{description}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Flow 4 — Real-Time Browser Updates}
+
+The \servicename{WS Gateway} maintains persistent WebSocket connections with
+all connected browsers. It subscribes to:
+\texttt{anomaly.detected.>}, \texttt{ai.explanation.ready.>},
+\texttt{rootcause.ready.>}, and \texttt{forecast.critical.>}.
+
+When a message arrives, the gateway fan-outs it to all WebSocket clients of
+the relevant organisation (multi-tenant isolation enforced). The dashboard
+refreshes with no polling — detection-to-display latency is under 3 seconds.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Flow 5 — Dashboard Query}
+
+When an operator opens the dashboard, the browser sends
+\texttt{GET /api/v1/dashboard/summary} to the \servicename{Query API} (via Nginx).
+It aggregates server statuses, 24-hour anomalies, at-risk forecasts, and the
+latest root-cause analyses into a structured response:
+\textit{overall\_status}, \textit{potential\_issues} (sorted by criticality),
+and \textit{recommended\_actions} (numbered). The answers-first interface
+presents this immediately without requiring the operator to read graphs.
+
+\section{Event Bus: NATS JetStream}
+
+NATS JetStream \cite{nats_docs} was selected over Kafka and RabbitMQ for
+its 30\,MB memory footprint, sub-millisecond latency, and simple configuration
+while offering the durability guarantees needed (disk persistence, acknowledgements).
+
+\begin{table}[H]
+\centering
+\caption{NATS JetStream streams in \caimp{}}
+\label{tab:nats-streams}
+\small
+\begin{tabularx}{\textwidth}{llXll}
+\toprule
+\textbf{Stream} & \textbf{Subjects} & \textbf{Description} & \textbf{Retention} & \textbf{Consumers} \\
+\midrule
+METRICS     & \texttt{metric.received.>}       & Raw metric batches          & 24h  & 2 \\
+ANOMALIES   & \texttt{anomaly.detected.>}      & Detected anomalies          & 7d   & 3 \\
+AI\_OUT     & \texttt{ai.explanation.ready.>}  & AI explanations             & 30d  & 1 \\
+CHAT        & \texttt{chat.requested.>}        & Chat requests               & 1h   & 1 \\
+AUDIT       & \texttt{audit.log.>}             & Audit events                & 90d  & 0 \\
+FORECASTS   & \texttt{forecast.>}              & Forecast results            & 30d  & 1 \\
+CHANGES     & \texttt{change.detected.>}       & System changes              & 7d   & 2 \\
+ROOT\_CAUSE & \texttt{rootcause.ready.>}       & Root cause analyses         & 30d  & 1 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Data Model}
+
+\subsection{Design Principles}
+
+Two fundamental principles guided the data model:
+\begin{enumerate}
+  \item \textbf{Multi-tenant isolation via RLS}: every table carrying application
+    data contains an \texttt{org\_id} column. RLS policies guarantee a query can
+    only access the current organisation's rows (via \texttt{current\_org\_id()}).
+  \item \textbf{Hypertables for time-series data}: \texttt{metrics} and
+    \texttt{change\_events} are TimescaleDB hypertables partitioned automatically
+    by time chunks. TimescaleDB applies columnar compression after 7 days,
+    reducing storage by a factor of 10--20.
+\end{enumerate}
+
+\subsection{Key Tables by Domain}
+
+\textbf{Authentication \& Management:} \texttt{organizations}, \texttt{users},
+\texttt{servers}, \texttt{ca\_config}, \texttt{agent\_certs},
+\texttt{enrollment\_tokens}, \texttt{refresh\_token\_blacklist}, \texttt{audit\_log}.
+
+\textbf{Metrics \& Anomalies:} \texttt{metrics} (hypertable), \texttt{anomaly\_events},
+\texttt{alert\_rules}, \texttt{notifications}.
+
+\textbf{AI:} \texttt{ai\_explanations}, \texttt{server\_forecasts}, \texttt{rag\_documents},
+\texttt{runbooks}.
+
+\textbf{Change Correlation:} \texttt{change\_events} (hypertable),
+\texttt{root\_cause\_analyses}.
+
+\textbf{Splunk:} \texttt{splunk\_incidents}, \texttt{splunk\_ai\_explanations},
+\texttt{ai\_feedback}, \texttt{org\_config}.
+
+\section{Key Processing Flows}
+
+\subsection{Change Correlation Flow}
+
+\begin{enumerate}
+  \item Correlation Engine receives \texttt{anomaly.detected.*} message;
+  \item Queries \texttt{change\_events} in window $[t - 30\text{min}, t]$
+    for the same server;
+  \item Scores each change: $s = e^{-0.1 \cdot \Delta t} \times w_{\text{type}}$,
+    where $\Delta t$ is minutes before anomaly and $w_{\text{type}} \in [0.3, 1.0]$;
+  \item Top 3 changes sent to Ollama with anomaly context;
+  \item Result persisted in \texttt{root\_cause\_analyses}, published to
+    \texttt{rootcause.ready.\{org\_id\}}.
+\end{enumerate}
+
+\section{Security: STRIDE Threat Model}
+
+\begin{table}[H]
+\centering
+\caption{STRIDE analysis and countermeasures in \caimp{}}
+\label{tab:stride}
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Threat} & \textbf{Example} & \textbf{Countermeasure} \\
+\midrule
+Spoofing       & Malicious agent sending forged metrics     & mTLS ECDSA P-256; JWT \\
+Tampering      & Metric modification in transit             & TLS 1.3; AEAD integrity \\
+Repudiation    & Deny an administrative action              & Immutable audit\_log \\
+Info Disclosure& Access to another org's data               & RLS PostgreSQL; Docker bridge \\
+DoS            & Metric flood from compromised agent        & Nginx rate limiting \\
+EoP            & Viewer accessing admin routes              & RBAC role check per endpoint \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Conclusion}
+
+This chapter presented the architectural foundations of \caimp{}: the microservices
+design, four-layer organisation, NATS JetStream event bus, relational data model
+and key processing flows. This architecture ensures the separation of concerns
+necessary for platform scalability and maintainability. The next chapter justifies
+the technology choices that give this architecture substance.

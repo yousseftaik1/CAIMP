@@ -1,0 +1,62 @@
+% ============================================================================
+% CAIMP — Project Report (English version)
+% Faculté des Sciences et Techniques de Settat — Université Hassan Premier
+% Authors: CHAHIDY Rim · SAMDI Wiame  · TAIK Youssef
+% Academic year 2025–2026
+% Compile with: latexmk -pdf -bibtex main.tex
+% ============================================================================
+
+\documentclass[12pt,a4paper,oneside,english]{report}
+
+\input{preamble}
+
+\begin{document}
+
+\pagenumbering{gobble}
+\include{cover}
+\clearpage
+
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\include{frontmatter/abstract}
+
+\tableofcontents
+\addcontentsline{toc}{chapter}{Table of Contents}
+\clearpage
+
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\clearpage
+
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\clearpage
+
+\include{frontmatter/abbreviations}
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\include{chapters/00_introduction}
+\include{chapters/01_context}
+\include{chapters/02_state_of_the_art}
+\include{chapters/03_requirements}
+\include{chapters/04_design}
+\include{chapters/05_technologies}
+\include{chapters/06_implementation}
+\include{chapters/07_testing}
+\include{chapters/08_deployment}
+\include{chapters/09_results}
+\include{chapters/10_conclusion}
+
+\printbibliography[heading=bibintoc, title={References}]
+
+\appendix
+\renewcommand{\thechapter}{\Alph{chapter}}
+\include{annexes/appendix_a_database}
+\include{annexes/appendix_b_api}
+\include{annexes/appendix_c_docker}
+\include{annexes/appendix_d_glossary}
+
+\end{document}

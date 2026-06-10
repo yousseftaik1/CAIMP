@@ -1,0 +1,151 @@
+\chapter{Requirements Analysis and Specification}
+
+\section*{Introduction}
+
+This chapter formalises the system requirements as functional and non-functional
+needs, identifies the actors, and presents the UML models that guide the design
+phase. The analysis drew on the comparative study from the previous chapter,
+supplemented by concrete usage scenarios.
+
+\section{Actor Identification}
+
+\begin{description}[leftmargin=2.5cm, style=nextline]
+  \item[\textbf{Administrator}] Most privileged role. Manages organisations, users,
+    servers and platform configuration. Accesses the Admin API (port 8001).
+  \item[\textbf{Operator}] Technical user who consults dashboards, manages runbooks,
+    configures alert rules and interprets AI analyses. Role \texttt{devops} in the database.
+  \item[\textbf{Viewer}] Read-only access. Consults dashboards and PDF reports. Designed
+    for non-technical stakeholders.
+  \item[\textbf{System Agent}] Non-human actor. The \texttt{caimp-agent} daemon process
+    runs on monitored servers, authenticates via mTLS certificate and sends metrics via OTLP.
+\end{description}
+
+\section{Functional Requirements}
+
+\begin{enumerate}[label=\textbf{FR\arabic*}, leftmargin=2.2cm, itemsep=4pt]
+  \item The agent must collect CPU, memory and disk metrics every 15 seconds and transmit them via OTLP/HTTP.
+  \item The agent must self-register with the platform using a single-use enrollment token.
+  \item The agent must use an mTLS certificate issued by the internal CA for every connection.
+  \item The agent must detect and report Docker events automatically.
+  \item The agent must monitor package installation logs and SSH events from authentication logs.
+  \item The platform must detect anomalies in real time using at least three distinct algorithms.
+  \item Detected anomalies must be published on NATS JetStream for asynchronous processing.
+  \item The AI analysis engine must query the vector database to retrieve similar past incidents and relevant runbooks.
+  \item The AI analysis engine must submit a structured prompt to Ollama and validate the JSON response.
+  \item The AI explanation must contain: natural-language explanation, probable root cause, recommended action, and confidence level.
+  \item The correlation engine must query \texttt{change\_events} within the 30-minute window before each anomaly.
+  \item The correlation engine must score each change by temporal proximity and type, and produce a ranked list of probable causes.
+  \item The forecast engine must compute Holt-Winters predictions over 24 hours for each server/metric pair.
+  \item The forecast engine must calculate the \textit{time to critical} — the predicted delay before threshold breach.
+  \item Alert deduplication must suppress identical alerts within 15 minutes.
+  \item The query API must expose a \texttt{/dashboard/summary} endpoint aggregating global status, potential issues and recommended actions.
+  \item The user interface must present the global status, potential issues sorted by criticality and numbered recommended actions on the home page.
+  \item The platform must allow runbook management (create, edit, delete) with automatic embedding re-indexing.
+  \item The report module must generate a multi-section PDF report readable by non-technical stakeholders.
+  \item The interface must provide an SSE chatbot for natural-language questions about incidents and servers.
+  \item The platform must receive GitHub and GitLab webhooks for deployment events.
+  \item The administrator must be able to configure notification channels (Slack, PagerDuty).
+  \item Status updates must be pushed in real time to connected browsers via WebSocket.
+  \item The platform must support multi-tenant isolation: one organisation's data must never be accessible by another.
+  \item Each service must provide a health endpoint used by Docker healthchecks.
+\end{enumerate}
+
+\section{Non-Functional Requirements}
+
+\textbf{Performance:} OTLP batch processing $<$50\,ms latency p50; throughput
+$\geq$1,000 metrics/second; API GET responses $<$300\,ms for 50 servers; full AI
+explanation $<$30 seconds.
+
+\textbf{Security:} Agent mTLS (TLS 1.3); single-use enrollment tokens expiring
+in 30 minutes; JWT HS256 with 15-minute expiry; RLS PostgreSQL; AES-256-GCM
+encrypted Splunk secrets; immutable audit log.
+
+\textbf{Availability:} 99.5\% uptime target; Docker healthchecks with
+\texttt{unless-stopped} restart; local SQLite buffering in agent; JetStream
+message durability on disk.
+
+\textbf{Maintainability:} Independent, individually deployable services;
+versioned DB migrations; conventional commits; inline documentation.
+
+\section{Use Case Diagram}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  actor/.style={draw=NavyBlue, fill=NavyBlue!10, rounded corners=3pt,
+    minimum width=1.8cm, minimum height=0.7cm, font=\small\bfseries},
+  uc/.style={draw=TealBlue, fill=TealBlue!8, ellipse,
+    minimum width=3.4cm, minimum height=0.9cm, font=\small, align=center},
+  sysbox/.style={draw=NavyBlue!50, dashed, rounded corners=6pt, fill=NavyBlue!3}
+]
+\node[sysbox, minimum width=13cm, minimum height=11cm] (sys) at (5.5,0) {};
+\node[above, font=\small\bfseries\color{NavyBlue}] at (sys.north) {CAIMP System};
+
+\node[actor] (admin)  at (-1.2, 3.0) {Admin};
+\node[actor] (ops)    at (-1.2, 0.5) {Operator};
+\node[actor] (viewer) at (-1.2,-2.0) {Viewer};
+\node[actor] (agent)  at (12.5, 0.5) {Agent};
+
+\node[uc] (login)    at (3.0, 4.5) {Authenticate};
+\node[uc] (usrmgr)   at (7.0, 4.5) {Manage users};
+\node[uc] (srvmgr)   at (7.0, 3.0) {Manage servers};
+\node[uc] (dash)     at (3.0, 1.8) {View dashboard};
+\node[uc] (alerts)   at (7.0, 1.8) {View live alerts};
+\node[uc] (runbooks) at (3.0, 0.2) {Manage runbooks};
+\node[uc] (chat)     at (7.0, 0.2) {Use AI chat};
+\node[uc] (report)   at (3.0,-1.4) {Export PDF};
+\node[uc] (forecast) at (7.0,-1.4) {View forecasts};
+\node[uc] (metrics)  at (5.0,-3.0) {Send metrics\\(OTLP)};
+\node[uc] (enroll)   at (9.0,-3.0) {Enrol (mTLS)};
+
+\draw[->, NavyBlue] (admin)  -- (login);
+\draw[->, NavyBlue] (admin)  -- (usrmgr);
+\draw[->, NavyBlue] (admin)  -- (srvmgr);
+\draw[->, NavyBlue] (ops)    -- (login);
+\draw[->, NavyBlue] (ops)    -- (dash);
+\draw[->, NavyBlue] (ops)    -- (alerts);
+\draw[->, NavyBlue] (ops)    -- (runbooks);
+\draw[->, NavyBlue] (ops)    -- (chat);
+\draw[->, NavyBlue] (ops)    -- (forecast);
+\draw[->, NavyBlue] (viewer) -- (login);
+\draw[->, NavyBlue] (viewer) -- (dash);
+\draw[->, NavyBlue] (viewer) -- (report);
+\draw[->, NavyBlue] (agent)  -- (metrics);
+\draw[->, NavyBlue] (agent)  -- (enroll);
+\end{tikzpicture}
+\caption{Global use case diagram of the \caimp{} platform}
+\label{fig:ucd}
+\end{figure}
+
+\section{Requirement Traceability Matrix}
+
+\begin{table}[H]
+\centering
+\caption{Traceability matrix: functional requirements — components}
+\label{tab:traceability}
+\small
+\begin{tabularx}{\textwidth}{lXll}
+\toprule
+\textbf{FR} & \textbf{Requirement} & \textbf{Component} & \textbf{Module} \\
+\midrule
+FR1  & OTLP metric collection       & \servicename{caimp-agent}        & \texttt{collectors.py} \\
+FR6  & 3-algorithm anomaly detection & \servicename{telemetry-writer}   & \texttt{detector.go} \\
+FR8--FR10 & AI explanation           & \servicename{ai-worker}          & \texttt{prompt\_builder.py} \\
+FR11--FR12 & Change correlation      & \servicename{correlation-engine} & \texttt{main.py} \\
+FR13--FR14 & Holt-Winters forecast   & \servicename{forecast-engine}    & \texttt{forecaster.py} \\
+FR15 & Alert deduplication           & \servicename{alert-engine}       & \texttt{worker.py} \\
+FR16--FR17 & Answers-first dashboard & \servicename{query-api}          & \texttt{dashboard.py} \\
+FR18 & Runbook CRUD + RAG            & \servicename{query-api}          & \texttt{incidents.py} \\
+FR21 & GitHub/GitLab webhooks        & \servicename{change-tracker}     & \texttt{main.py} \\
+FR23 & WebSocket push                & \servicename{ws-gateway}         & \texttt{main.py} \\
+FR24 & Multi-tenant isolation        & PostgreSQL                       & RLS migrations \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Conclusion}
+
+The requirements analysis identified 25 functional requirements covering the full
+scope of \caimp{}, and formalised non-functional requirements around performance,
+security, availability and maintainability. The UML models presented constitute
+the contract between analysis and the design covered in the next chapter.

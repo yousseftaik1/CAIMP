@@ -1,0 +1,89 @@
+# =============================================================================
+# OpenTelemetry Collector — CAIMP v2 (custom caimp-otelcol binary)
+# =============================================================================
+
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+  zpages:
+    endpoint: "0.0.0.0:55679"
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+        # mTLS: uncomment once PKI is provisioned (TASK-007)
+        # tls:
+        #   cert_file:       /etc/otelcol/certs/server.crt
+        #   key_file:        /etc/otelcol/certs/server.key
+        #   ca_file:         /etc/otelcol/certs/ca.crt
+        #   client_ca_file:  /etc/otelcol/certs/ca.crt
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  # Tenancy: validate org.id, JWT, cardinality; stamp caimp.org_id
+  tenancy:
+    jwt_secret:                 ${env:JWT_SECRET}
+    cardinality_limit_per_org:  10000
+    require_org_id:             ${env:OTELCOL_REQUIRE_ORG_ID}   # false in dev, true in prod
+
+  memory_limiter:
+    limit_mib:        512
+    spike_limit_mib:  128
+    check_interval:   5s
+
+  resourcedetection:
+    detectors: [env, docker]
+    timeout:   10s
+
+  batch:
+    timeout:             10s
+    send_batch_size:     8192
+    send_batch_max_size: 16384
+
+exporters:
+  # Forward to Telemetry Writer over internal HTTP
+  otlphttp/telemetry_writer:
+    endpoint: "http://telemetry-writer:4318"
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled:          true
+      initial_interval: 5s
+      max_interval:     30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled:       true
+      num_consumers: 4
+      queue_size:    1000
+
+  # Prometheus self-metrics
+  prometheus:
+    endpoint:   "0.0.0.0:8888"
+    namespace:  otelcol
+
+  debug:
+    verbosity: normal
+
+service:
+  extensions: [health_check, zpages]
+  pipelines:
+    metrics:
+      receivers:  [otlp]
+      processors: [memory_limiter, tenancy, resourcedetection, batch]
+      exporters:  [otlphttp/telemetry_writer, prometheus]
+    logs:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [debug]
+    traces:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [debug]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level:   none   # prometheus exporter owns :8888; disable duplicate self-metrics binding

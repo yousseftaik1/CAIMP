@@ -1,0 +1,67 @@
+% ============================================================================
+% CAIMP — Rapport de Projet de Fin de Module
+% Faculté des Sciences et Techniques de Settat — Université Hassan Premier
+% Auteurs : CHAHIDY Rim · SAMDI Wiam · TAÏK Youssef
+% Année universitaire 2025–2026
+% Compiler avec : latexmk -pdf -bibtex main.tex
+% ============================================================================
+
+\documentclass[12pt,a4paper,oneside,french]{report}
+
+\input{preamble}
+
+\begin{document}
+
+% ---- Couverture (pas de numérotation) ----
+\pagenumbering{gobble}
+\include{cover}
+\clearpage
+
+% ---- Pages préliminaires (numérotation romaine) ----
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\include{frontmatter/resume}
+
+\tableofcontents
+\addcontentsline{toc}{chapter}{Table des matières}
+\clearpage
+
+\listoffigures
+\addcontentsline{toc}{chapter}{Liste des figures}
+\clearpage
+
+\listoftables
+\addcontentsline{toc}{chapter}{Liste des tableaux}
+\clearpage
+
+\include{frontmatter/abreviations}
+
+% ---- Corps du rapport (numérotation arabe) ----
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\include{chapters/00_introduction}
+\include{chapters/01_contexte}
+\include{chapters/02_etat_de_l_art}
+\include{chapters/03_analyse_besoins}
+\include{chapters/04_conception}
+\include{chapters/05_technologies}
+\include{chapters/06_realisation}
+\include{chapters/07_tests_validation}
+\include{chapters/08_deploiement}
+\include{chapters/09_resultats_discussion}
+\include{chapters/10_conclusion}
+
+% ---- Bibliographie ----
+\printbibliography[heading=bibintoc, title={Références bibliographiques}]
+
+% ---- Annexes ----
+\appendix
+\renewcommand{\thechapter}{\Alph{chapter}}
+\include{annexes/annexe_a_schema_bd}
+\include{annexes/annexe_b_api_endpoints}
+\include{annexes/annexe_c_docker_compose}
+\include{annexes/annexe_d_glossaire}
+
+\end{document}

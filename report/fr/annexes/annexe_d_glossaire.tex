@@ -1,0 +1,151 @@
+% ============================================================================
+% Annexe D — Glossaire technique
+% ============================================================================
+\chapter{Glossaire technique}
+
+\begin{description}[leftmargin=3.5cm, style=nextline, font=\bfseries\color{NavyBlue}]
+
+  \item[AIOps]
+    \textit{Artificial Intelligence for IT Operations}. Application des techniques
+    d'apprentissage automatique et d'IA aux opérations informatiques, notamment
+    pour la détection d'anomalies, la corrélation d'événements et la génération
+    automatique de recommandations.
+
+  \item[Alert fatigue]
+    (\textit{fatigue d'alertes}) Phénomène psychologique par lequel les opérateurs
+    finissent par ignorer les alertes en raison de leur volume excessif ou d'un
+    taux élevé de faux positifs.
+
+  \item[Asyncio]
+    Bibliothèque Python de programmation asynchrone basée sur des coroutines
+    (async/await) et une boucle d'événements (\textit{event loop}), permettant la
+    gestion concurrente de nombreuses connexions réseau sans threads système.
+
+  \item[Chunk]
+    Dans TimescaleDB, unité de stockage physique correspondant à une partition
+    temporelle de l'hypertable. Les chunks anciens sont automatiquement compressés.
+
+  \item[Embedding]
+    Représentation vectorielle dense d'un texte dans un espace de haute dimension.
+    Deux textes sémantiquement proches produisent des vecteurs proches selon la
+    distance cosinus. Utilisé dans \caimp{} pour la recherche de runbooks et
+    d'incidents similaires.
+
+  \item[GGUF]
+    Format de fichier pour les modèles de langage quantifiés, utilisé par Ollama
+    et \texttt{llama.cpp}. Remplace les formats GGML et GGML-v3.
+
+  \item[Goroutine]
+    Fil d'exécution léger du langage Go, géré par le runtime Go plutôt que par
+    l'OS. Des milliers de goroutines peuvent s'exécuter simultanément avec
+    une empreinte mémoire minimale.
+
+  \item[Healthcheck]
+    Dans Docker, commande exécutée périodiquement pour vérifier que le service
+    est opérationnel. Si le healthcheck échoue plusieurs fois, Docker peut
+    redémarrer le conteneur.
+
+  \item[HNSW]
+    \textit{Hierarchical Navigable Small World}. Algorithme de recherche approximative
+    de voisins les plus proches dans les espaces vectoriels de haute dimension.
+    Offre une complexité de recherche $O(\log n)$ avec une précision proche
+    de la recherche exhaustive.
+
+  \item[Holt-Winters]
+    Algorithme de lissage exponentiel double (niveau + tendance) pour la prévision
+    de séries temporelles à tendance linéaire. Conçu par Charles Holt (1957) et
+    Peter Winters (1960).
+
+  \item[Hypertable]
+    Extension de table PostgreSQL par TimescaleDB qui partitionne automatiquement
+    les données par intervalles de temps, permettant des performances d'insertion
+    et de requête très élevées sur les données temporelles.
+
+  \item[JWT]
+    \textit{JSON Web Token}. Standard RFC 7519 pour la représentation de claims
+    entre deux parties sous forme de JSON signé (JWS) ou chiffré (JWE). Utilisé
+    dans \caimp{} pour l'authentification des requêtes API.
+
+  \item[LLM]
+    \textit{Large Language Model}. Modèle de réseau de neurones entraîné sur de
+    grandes quantités de texte pour générer ou compléter du texte en langage
+    naturel. Exemples : Llama, GPT, Mistral, Gemma.
+
+  \item[mTLS]
+    \textit{mutual Transport Layer Security}. Extension du protocole TLS dans
+    laquelle les deux parties (client et serveur) s'authentifient mutuellement
+    par certificat numérique. Utilisé dans \caimp{} pour authentifier les agents
+    de supervision.
+
+  \item[NATS JetStream]
+    Extension persistante du système de messagerie NATS, offrant des garanties
+    de livraison at-least-once, des consommateurs durables et un stockage
+    des messages sur disque.
+
+  \item[Ollama]
+    Serveur d'inférence LLM local exposant une API REST. Prend en charge les
+    modèles GGUF (quantifiés) et permet l'exécution de modèles sur des machines
+    sans GPU.
+
+  \item[OTLP]
+    \textit{OpenTelemetry Protocol}. Protocole standardisé par la CNCF pour la
+    transmission de métriques, traces et journaux entre les agents d'instrumentation
+    et les backends d'observabilité.
+
+  \item[pgvector]
+    Extension PostgreSQL ajoutant le type de données \texttt{VECTOR(n)} et les
+    opérateurs de similarité (cosinus, produit scalaire, distance L2). Permet
+    la recherche de voisins les plus proches directement dans PostgreSQL.
+
+  \item[Q4\_K\_M]
+    Schéma de quantification 4 bits utilisant la méthode K-means pour grouper
+    les poids du modèle. Offre un excellent compromis entre taille (réduction
+    de 75~\% vs fp16) et qualité d'inférence.
+
+  \item[RAG]
+    \textit{Retrieval-Augmented Generation}. Technique qui améliore la qualité
+    des réponses d'un LLM en récupérant dynamiquement des documents pertinents
+    depuis une base de connaissances et en les injectant dans le prompt.
+
+  \item[RLS]
+    \textit{Row-Level Security}. Fonctionnalité PostgreSQL permettant de définir
+    des politiques de contrôle d'accès au niveau de chaque ligne d'une table.
+    Utilisée dans \caimp{} pour l'isolation multi-tenant.
+
+  \item[SSE]
+    \textit{Server-Sent Events}. Protocole HTTP unidirectionnel permettant
+    au serveur d'envoyer des flux de données en continu vers le client.
+    Utilisé dans \caimp{} pour le streaming des réponses du chat IA.
+
+  \item[Subject NATS]
+    Chaîne de caractères hiérarchique identifiant le canal d'un message NATS
+    (ex: \texttt{anomaly.detected.org-1.critical}). Les abonnements peuvent
+    utiliser des jokers (\texttt{>} pour zéro ou plusieurs niveaux).
+
+  \item[Time to critical]
+    (\textit{délai jusqu'à la criticité}) Dans \caimp{}, nombre d'heures prévu
+    avant qu'une métrique dépasse le seuil de 90~\%, calculé par interpolation
+    sur les prévisions Holt-Winters.
+
+  \item[TimescaleDB]
+    Extension PostgreSQL transformant une base de données relationnelle en base
+    de données temporelles haute performance, avec partitionnement automatique
+    (hypertables), compression columnar et politiques de rétention automatiques.
+
+  \item[VPS]
+    \textit{Virtual Private Server}. Serveur virtuel isolé hébergé dans un
+    datacenter tiers, proposé par des fournisseurs comme OVH, DigitalOcean
+    ou Hetzner.
+
+  \item[WebSocket]
+    Protocole de communication bidirectionnel full-duplex sur une connexion TCP
+    persistante (RFC 6455). Utilisé dans \caimp{} pour pousser les événements
+    en temps réel vers les navigateurs connectés.
+
+  \item[Z-score]
+    Mesure statistique exprimant l'écart d'une observation à la moyenne en
+    unités d'écart-type :
+    $z = (x - \mu) / \sigma$. Une valeur $|z| > 3$ est considérée comme
+    statistiquement anormale dans une distribution normale.
+
+\end{description}

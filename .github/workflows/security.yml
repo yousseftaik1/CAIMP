@@ -1,0 +1,147 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Run nightly at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Trivy — scan all Docker images for known CVEs
+  # ---------------------------------------------------------------------------
+  trivy-images:
+    name: Trivy Image Scan — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: telemetry-writer
+            context: ./services/telemetry-writer
+            dockerfile: Dockerfile
+          - service: admin-api
+            context: .
+            dockerfile: services/api-admin/Dockerfile
+          - service: query-api
+            context: .
+            dockerfile: services/api-query/Dockerfile
+          - service: ai-worker
+            context: .
+            dockerfile: services/ai-worker/Dockerfile
+          - service: alert-engine
+            context: .
+            dockerfile: services/alert-engine/Dockerfile
+          - service: ws-gateway
+            context: .
+            dockerfile: services/ws-gateway/Dockerfile
+          - service: frontend
+            context: .
+            dockerfile: frontend/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: caimp/${{ matrix.service }}:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy scan — HIGH/CRITICAL CVEs
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: caimp/${{ matrix.service }}:scan
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+  # ---------------------------------------------------------------------------
+  # Trivy — scan the repository filesystem for secrets and misconfigurations
+  # ---------------------------------------------------------------------------
+  trivy-repo:
+    name: Trivy Repo & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-repo.sarif
+          severity: HIGH,CRITICAL
+          scanners: vuln,secret,misconfig
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-repo.sarif
+          category: trivy-repo
+
+  # ---------------------------------------------------------------------------
+  # pip-audit — Python dependency vulnerabilities (advisory database)
+  # ---------------------------------------------------------------------------
+  pip-audit:
+    name: pip-audit (Python deps)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - services/api-admin
+          - services/api-query
+          - services/ai-worker
+          - services/alert-engine
+          - services/ws-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r ${{ matrix.service }}/requirements.txt --strict
+
+  # ---------------------------------------------------------------------------
+  # govulncheck — Go vulnerability database check for telemetry-writer
+  # ---------------------------------------------------------------------------
+  govulncheck:
+    name: govulncheck (Go deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: govulncheck
+        working-directory: services/telemetry-writer
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

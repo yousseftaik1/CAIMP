@@ -1,0 +1,83 @@
+% ============================================================================
+% Annexe B — Endpoints API
+% ============================================================================
+\chapter{Référence des endpoints API}
+
+\section{Admin API (port 8001)}
+
+\begin{longtable}{llp{4.5cm}p{3.5cm}}
+\toprule
+\textbf{Méthode} & \textbf{URL} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+POST & \texttt{/auth/login}   & Authentification JWT & Aucune \\
+POST & \texttt{/auth/refresh} & Renouvellement token & Refresh token \\
+POST & \texttt{/auth/logout}  & Révocation token     & JWT \\
+GET  & \texttt{/admin/users}  & Liste des utilisateurs & JWT (admin) \\
+POST & \texttt{/admin/users}  & Créer un utilisateur & JWT (admin) \\
+DELETE & \texttt{/admin/users/\{id\}} & Supprimer utilisateur & JWT (admin) \\
+GET  & \texttt{/admin/servers} & Liste des serveurs  & JWT \\
+POST & \texttt{/admin/servers} & Enregistrer un serveur & JWT (admin) \\
+POST & \texttt{/admin/servers/\{id\}/enroll} & Générer token d'enrôlement & JWT (admin) \\
+GET  & \texttt{/health}        & État du service      & Aucune \\
+\end{longtable}
+
+\section{Query API (port 8002)}
+
+\begin{longtable}{llp{4.5cm}p{3.5cm}}
+\toprule
+\textbf{Méthode} & \textbf{URL} & \textbf{Description} & \textbf{Cache} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+GET & \texttt{/api/v1/dashboard/summary}       & Vue answers-first      & 30s \\
+GET & \texttt{/api/v1/servers}                 & Liste des serveurs     & 60s \\
+GET & \texttt{/api/v1/servers/\{id\}/summary}  & Résumé live (CPU/RAM/Disk) & 30s \\
+GET & \texttt{/api/v1/servers/\{id\}/splunk}   & Santé Splunk du serveur & 60s \\
+GET & \texttt{/api/v1/metrics}                 & Métriques historiques  & 30s \\
+GET & \texttt{/api/v1/anomalies}               & Liste des anomalies    & Non \\
+GET & \texttt{/api/v1/ai/explanations}         & Explications IA        & Non \\
+GET & \texttt{/api/v1/forecasts}               & Prévisions Holt-Winters & 60s \\
+GET & \texttt{/api/v1/incidents}               & Incidents Splunk       & Non \\
+GET & \texttt{/api/v1/incidents/\{id\}}        & Détail incident        & Non \\
+POST & \texttt{/api/v1/incidents/\{id\}/feedback} & Rating thumbs-up/down & — \\
+GET & \texttt{/api/v1/runbooks}                & Liste des runbooks     & Non \\
+POST & \texttt{/api/v1/runbooks}               & Créer runbook + embed  & — \\
+PUT & \texttt{/api/v1/runbooks/\{id\}}         & Modifier runbook       & — \\
+DELETE & \texttt{/api/v1/runbooks/\{id\}}      & Supprimer runbook      & — \\
+GET & \texttt{/api/v1/reports/pdf}             & Télécharger rapport PDF & — \\
+GET & \texttt{/health}                         & État du service        & — \\
+\end{longtable}
+
+\section{AI Orchestrator (port 8010)}
+
+\begin{longtable}{llp{5cm}p{3cm}}
+\toprule
+\textbf{Méthode} & \textbf{URL} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+POST & \texttt{/webhook/anomaly} & Reçoit un incident Splunk & Signature HMAC \\
+POST & \texttt{/chat}            & Chat SSE avec l'IA (streaming) & JWT \\
+GET  & \texttt{/health}          & État du service & Aucune \\
+\end{longtable}
+
+\section{Change Tracker (port 8011)}
+
+\begin{longtable}{llp{5cm}p{3cm}}
+\toprule
+\textbf{Méthode} & \textbf{URL} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+POST & \texttt{/ingest}              & Événement générique (agent) & JWT \\
+POST & \texttt{/ingest/docker}       & Événement Docker (agent)    & JWT \\
+POST & \texttt{/webhooks/github}     & Webhook GitHub              & HMAC \\
+POST & \texttt{/webhooks/gitlab}     & Webhook GitLab              & Token header \\
+GET  & \texttt{/health}              & État du service             & Aucune \\
+\end{longtable}

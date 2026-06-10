@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "caimp-nats-client"
+version = "0.1.0"
+description = "Typed NATS JetStream client for CAIMP v2 services"
+requires-python = ">=3.12"
+dependencies = [
+    "nats-py>=2.7.2",
+    "pydantic>=2.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nats_client*"]

@@ -1,0 +1,48 @@
+# =============================================================================
+# Dev overrides — hot-reload mounts, extra ports, relaxed healthchecks.
+# Applied automatically when you run `docker compose up` in development.
+# Do NOT commit secrets or personal tweaks here.
+# =============================================================================
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"   # expose for local psql / DBeaver
+
+  redis:
+    ports:
+      - "6379:6379"   # expose for local redis-cli
+
+  nats:
+    ports:
+      - "4222:4222"
+      - "8222:8222"   # expose monitoring UI at http://localhost:8222
+
+  query-api:
+    volumes:
+      - ./services/api-query:/app
+    environment:
+      RELOAD: "true"
+
+  admin-api:
+    volumes:
+      - ./services/api-admin:/app
+    environment:
+      RELOAD: "true"
+
+  ai-worker:
+    volumes:
+      - ./services/ai-worker:/app
+
+  alert-engine:
+    volumes:
+      - ./services/alert-engine:/app
+
+  ws-gateway:
+    volumes:
+      - ./services/ws-gateway:/app
+
+  forecast-engine:
+    volumes:
+      - ./services/forecast-engine:/app

@@ -1,0 +1,36 @@
+# =============================================================================
+# OpenTelemetry Collector Builder configuration — CAIMP v2
+# Builds a custom otelcol binary that includes the tenancy processor.
+#
+# Build:
+#   docker build -t caimp-otelcol ./services/otel-collector
+# =============================================================================
+
+dist:
+  name: caimp-otelcol
+  description: "CAIMP v2 custom OpenTelemetry Collector"
+  output_path: /build/output
+  otelcol_version: "0.104.0"
+
+extensions:
+  - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.104.0
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.104.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.104.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.104.0
+  # Custom tenancy processor (local module)
+  - gomod: github.com/caimp/otelcol/processor/tenancyprocessor v0.0.1
+    path: ./processor/tenancyprocessor
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.104.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.104.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.104.0

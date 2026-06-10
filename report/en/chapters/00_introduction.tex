@@ -1,0 +1,96 @@
+\chapter{General Introduction}
+\markboth{General Introduction}{General Introduction}
+
+\section*{Introduction}
+
+The rapid growth of cloud-native architectures over the past decade has profoundly
+transformed how organisations deploy and manage their information systems. Modern
+infrastructures, composed of dozens or even hundreds of servers, containers and
+distributed services, generate operational data streams of unprecedented density.
+In this context, system monitoring — once delegated to a network administrator
+scrutinising a handful of graphs — has become a discipline in its own right, at
+the heart of organisational resilience.
+
+Yet current monitoring tools, however sophisticated, share a fundamental
+limitation: they can \textit{detect} that a problem exists, but struggle to
+explain \textit{why} it appeared. When faced with a ``CPU at 98\%'' alert, the
+on-call engineer must still conduct a manual investigation lasting anywhere from
+thirty minutes to several hours. This gap between \textit{detection} and
+\textit{understanding} is precisely the problem this project sets out to solve.
+
+\section{Context and Motivation}
+
+Industry statistics confirm the scale of the challenge. According to PagerDuty's
+\textit{State of Digital Operations} report (2023) \cite{pagerduty2023}, the
+average cost of one hour of downtime exceeds \$300,000 for large enterprises,
+while the mean time to resolution (\textsc{mttr}) exceeds 45 minutes in
+organisations without mature \textsc{aiops} practices.
+
+For small teams — a startup with two developers managing a \textsc{vps}, an
+agency administering ten machines — the situation is even more critical. These
+teams lack both the human resource of a dedicated DevOps engineer and the budget
+for commercial solutions costing thousands of euros per month. They need a tool
+that simply answers: ``\textit{Is my server healthy? If not, what should I do?}''
+
+This is the context in which the \textbf{\caimp{}} project was born ---
+\textit{Centralized AI Monitoring Platform} --- a self-hosted, open-source
+platform that positions artificial intelligence not as a display gadget, but as
+the core of the diagnostic process.
+
+\section{Project Objectives}
+
+\begin{enumerate}[label=\textbf{O\arabic*.}, leftmargin=2.2cm]
+  \item \textbf{Answers-first dashboard}: design an interface whose home page
+    immediately presents the global status, potential issues and recommended
+    actions — requiring no monitoring expertise from the user.
+  \item \textbf{Automatic change correlation}: develop an engine capable of
+    linking each detected anomaly to recent environment modifications
+    (deployments, restarts, package updates, SSH sessions) to automate root
+    cause investigation.
+  \item \textbf{Natural-language explanation}: integrate a local language model
+    (without cloud API calls) to produce explanations understandable by a
+    developer with no DevOps training.
+  \item \textbf{Resource saturation forecasting}: implement a Holt-Winters
+    forecasting engine to anticipate threshold breaches over the next 24 hours.
+  \item \textbf{Robust microservices architecture}: design a decoupled architecture
+    based on an event bus (NATS JetStream) supporting horizontal scalability and
+    multi-tenant data isolation.
+  \item \textbf{End-to-end security}: implement mTLS for agents, JWT management,
+    and RLS-based data isolation per organisation.
+  \item \textbf{Accessible deployment}: make full installation achievable in
+    under ten minutes via Docker Compose, on any machine with 6\,GB of RAM.
+\end{enumerate}
+
+\section{Working Methodology}
+
+The development of \caimp{} followed an agile approach adapted to the academic
+context. The three-person team held daily synchronisation sessions
+(\textit{stand-ups}) and organised its work in weekly sprints of five days.
+The code repository was hosted on GitHub, with a protected main branch and a
+development branch from which features were developed and tested before
+integration. Commit messages followed the \textit{Conventional Commits}
+convention.
+
+\section{Report Structure}
+
+\begin{itemize}
+  \item \textbf{Chapter 1}: General context, modern observability, and the AIOps domain.
+  \item \textbf{Chapter 2}: State of the art of existing monitoring solutions.
+  \item \textbf{Chapter 3}: Functional and non-functional requirements, UML diagrams.
+  \item \textbf{Chapter 4}: Platform architecture, data model, and processing flows.
+  \item \textbf{Chapter 5}: Technology choices and justifications.
+  \item \textbf{Chapter 6}: Implementation details with annotated code extracts.
+  \item \textbf{Chapter 7}: Testing strategy and validation results.
+  \item \textbf{Chapter 8}: Deployment and production procedures.
+  \item \textbf{Chapter 9}: Results, discussion, and perspectives.
+  \item \textbf{Chapter 10}: General conclusion.
+\end{itemize}
+
+\section*{Conclusion}
+
+This project represents the culmination of one month of intensive work, during
+which a complete infrastructure monitoring platform was designed, developed,
+tested and documented. The following chapters demonstrate the scientific and
+technical rigour we sought to maintain throughout this process. The next
+chapter establishes the contextual foundations essential to understanding the
+work as a whole.

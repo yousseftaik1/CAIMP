@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5c4033;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3d2b1f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="256" height="256" rx="60" fill="#f5ede8" />
+  
+  <!-- The 'C' forming an incomplete ring -->
+  <path d="M 190 75 A 80 80 0 1 0 190 181" fill="none" stroke="url(#grad1)" stroke-width="24" stroke-linecap="round" />
+  
+  <!-- Pulse / Monitor Wave inside -->
+  <path d="M 70 128 L 100 128 L 115 90 L 140 166 L 155 128 L 185 128" fill="none" stroke="#3d2b1f" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

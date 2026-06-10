@@ -1,0 +1,49 @@
+# Secrets and local config
+.env
+*.env.local
+testconfig.txt
+test.md
+
+# Claude Code local settings
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+
+# Logs
+*.log
+
+# TLS / PKI artefacts
+infra/nginx/certs/
+infra/otel-collector/certs/
+*.key
+*.pem
+*.crt
+*.p12
+
+# LaTeX build output
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+report/**/*.pdf

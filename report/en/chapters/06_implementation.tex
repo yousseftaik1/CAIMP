@@ -1,0 +1,186 @@
+\chapter{Implementation}
+
+\section*{Introduction}
+
+This chapter presents the implementation details of \caimp{}'s key modules,
+illustrated with annotated code extracts. We describe the difficulties encountered,
+the solutions adopted, and the division of work within the team.
+
+\section{Repository Structure}
+
+The \caimp{} v2 repository uses a monorepo structure, with each service in its
+own directory under \texttt{services/}. The 14 database migrations are versioned
+under \texttt{infra/postgres/migrations/}, and the shared Python NATS client
+library is in \texttt{libs/nats\_client/}.
+
+\section{Work Breakdown}
+
+\begin{table}[H]
+\centering
+\caption{Team responsibilities}
+\label{tab:team}
+\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Member} & \textbf{Primary modules} \\
+\midrule
+CHAHIDY Rim  & Telemetry Writer (Go), Alert Engine, React frontend
+               (Dashboard, Forecasts, Incidents), CSS design system \\
+SAMDI Wiam   & AI Worker, AI Orchestrator, Correlation Engine,
+               RAG pipeline, LLM prompts, PDF reports \\
+TAÏK Youssef & Admin API, Query API, database (migrations, RLS),
+               Change Tracker, CAIMP agent, DevOps (Docker Compose, Makefile, scripts) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Telemetry Writer — Go}
+
+\begin{lstlisting}[language=C, caption={Z-score detector in Go}]
+// zScore computes Z-score over the last 100 historical values.
+func (d *Detector) zScore(ctx context.Context,
+    points []receiver.MetricPoint) []AnomalyEvent {
+
+    var events []AnomalyEvent
+    for _, p := range points {
+        rows, _ := d.pool.Query(ctx,
+            `SELECT value FROM metrics WHERE server_id=$1
+             AND metric_name=$2 ORDER BY time DESC LIMIT 100`,
+            p.ServerID, p.MetricName)
+        var vals []float64
+        for rows.Next() {
+            var v float64
+            if err := rows.Scan(&v); err == nil {
+                vals = append(vals, v)
+            }
+        }
+        rows.Close()
+        if len(vals) < 30 { continue }  // insufficient history
+
+        mean, std := meanStd(vals)
+        if std < 1e-9 { continue }
+        z := math.Abs((p.Value - mean) / std)
+        if z >= d.cfg.ZScoreThreshold {
+            sev := "warning"
+            if z >= d.cfg.ZScoreThreshold*1.5 { sev = "critical" }
+            events = append(events, AnomalyEvent{
+                Detector: "zscore", Severity: sev,
+                Value: p.Value, MetricName: p.MetricName,
+            })
+        }
+    }
+    return events
+}
+\end{lstlisting}
+
+\section{Holt-Winters Forecaster — Python/NumPy}
+
+\begin{lstlisting}[language=Python, caption={Holt-Winters double exponential smoothing}]
+def _holt_linear(values: np.ndarray, horizon: int,
+                 alpha: float = 0.3, beta: float = 0.1
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """Double exponential smoothing. Returns (forecasts, trend, fitted)."""
+    n = len(values)
+    level = float(values[0])
+    trend = float((values[-1] - values[0]) / max(n - 1, 1))
+    fitted = np.empty(n)
+    for t in range(n):
+        fitted[t] = level + trend
+        if t < n - 1:
+            prev_level = level
+            level = alpha * float(values[t]) + (1 - alpha) * (level + trend)
+            trend = beta * (level - prev_level) + (1 - beta) * trend
+    # h-step ahead forecast: L_T + h * T_T
+    forecasts = np.array([level + (h + 1) * trend for h in range(horizon)])
+    return forecasts, trend, fitted
+\end{lstlisting}
+
+\section{Change Correlation Scoring}
+
+\begin{lstlisting}[language=Python, caption={Temporal proximity scoring}]
+_TYPE_WEIGHT = {
+    "deployment": 1.0, "config": 0.9, "package": 0.8,
+    "docker_pull": 0.75, "restart": 0.7, "cron": 0.5, "ssh_login": 0.3,
+}
+
+def _score_change(change: dict, anomaly_time: datetime) -> float:
+    """Score = exp(-0.1 * minutes_before) * type_weight"""
+    occurred_at = change["occurred_at"]
+    if occurred_at.tzinfo is None:
+        occurred_at = occurred_at.replace(tzinfo=timezone.utc)
+    minutes_before = (anomaly_time - occurred_at).total_seconds() / 60
+    if minutes_before < 0:
+        return 0.0
+    temporal = math.exp(-0.1 * max(0, minutes_before))
+    return temporal * _TYPE_WEIGHT.get(change["change_type"], 0.5)
+\end{lstlisting}
+
+\section{Answers-First Dashboard — React}
+
+\begin{lstlisting}[language=C, caption={StatusBanner component in Dashboard.tsx}]
+function StatusBanner({ summary }: { summary: DashboardSummary }) {
+  const isCritical = summary.overall_status === 'critical'
+  const isHealthy  = summary.overall_status === 'healthy'
+  const bg = isCritical ? 'var(--danger)'  :
+             isHealthy  ? 'var(--success)' : 'var(--warning)'
+  return (
+    <div style={{ background: faint, border: `1.5px solid ${bg}`,
+                  borderRadius: 14, padding: '20px 28px',
+                  display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ width: 52, height: 52, borderRadius: '50%',
+                    background: bg, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center' }}>
+        {isCritical ? <AlertTriangle size={28} color="#fff" />
+                    : <Check size={28} color="#fff" />}
+      </div>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: bg }}>
+          {isHealthy ? 'All Systems Healthy' :
+           isCritical ? 'Action Required' :
+           'Potential Issues Detected'}
+        </div>
+        <div style={{ fontSize: 13.5, color: 'var(--text-2)' }}>
+          {summary.overall_message}
+        </div>
+      </div>
+    </div>
+  )
+}
+\end{lstlisting}
+
+\section{Challenges and Solutions}
+
+\begin{table}[H]
+\centering
+\caption{Key challenges and solutions}
+\label{tab:challenges}
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Challenge} & \textbf{Impact} & \textbf{Solution} \\
+\midrule
+OTLP metric name mismatch
+  & Agent used \texttt{cpu\_percent}; dashboard expected \texttt{system.cpu.utilization}
+  & Lookup table in Query API \\
+SSE context corruption in chat
+  & Tokens arrived out of order
+  & Numbered frames; ordered client buffer \\
+pgvector IVFFlat too slow
+  & RAG search $>$500ms with 10k vectors
+  & Migration to HNSW index, 8x faster \\
+Llama 3.1 8B OOM on 4\,GB RAM
+  & OOM killer terminates Ollama
+  & Test mode: switch to llama3.2:1b \\
+Alert duplication flood
+  & 50+ identical alerts in 15 minutes
+  & Redis NX keys with 15-min TTL \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section*{Conclusion}
+
+This chapter detailed the implementation of \caimp{}'s seven key modules.
+The code extracts illustrate the diversity of languages and paradigms mobilised
+across the platform. The next chapter evaluates the correctness of these
+implementations through systematic testing.

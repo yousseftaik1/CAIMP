@@ -1,0 +1,79 @@
+% ============================================================================
+% Résumés : français · anglais
+% ============================================================================
+
+% ---------- Résumé français ----------
+\chapter*{Résumé}
+\addcontentsline{toc}{chapter}{Résumé}
+\markboth{Résumé}{Résumé}
+
+\begin{infobox}[Résumé --- Français]
+La supervision des infrastructures informatiques constitue aujourd'hui un
+enjeu stratégique pour toute organisation exploitant des serveurs. Les outils
+traditionnels de surveillance tels que Prometheus, Grafana ou Datadog se
+concentrent sur l'affichage de métriques, laissant aux ingénieurs la charge
+d'interpréter les données et de diagnostiquer manuellement les incidents.
+Cette approche génère une \textit{fatigue d'alertes} importante et allonge
+considérablement le temps moyen de résolution (\textsc{mttr}).
+
+Ce rapport présente \textbf{\caimp{}} (\textit{Centralized AI Monitoring
+Platform}), une plateforme open source auto-hébergée qui repositionne la
+supervision autour d'une philosophie \textit{réponses-en-premier} : au lieu
+d'afficher des graphes, le tableau de bord répond directement à la question
+\og{}Quelque chose est-il cassé, et si oui, pourquoi ?\fg{}
+
+L'architecture repose sur 19 microservices conteneurisés communiquant via
+\textsc{nats} JetStream. Un agent léger déployé sur chaque serveur cible
+collecte les métriques système via \textsc{otlp} et signale automatiquement
+les changements d'environnement (déploiements Git, événements Docker,
+installations de paquets, connexions \textsc{ssh}). Un moteur de corrélation
+associe chaque anomalie détectée aux modifications survenues dans les 30
+minutes précédant l'incident et soumet l'analyse à un \textsc{llm} local
+(Llama 3.1 8B via Ollama) pour produire une explication en langage naturel.
+
+Le moteur de prévision applique le lissage exponentiel de Holt-Winters sur
+les 24 heures à venir. Un moteur de déduplication d'alertes élimine les
+doublons sur une fenêtre de 15 minutes. La plateforme est installable en
+moins de 10 minutes via Docker Compose.
+\end{infobox}
+
+\medskip
+\textbf{Mots-clés :} AIOps, supervision d'infrastructure, microservices,
+grand modèle de langage, TimescaleDB, NATS JetStream, corrélation de
+changements, détection d'anomalies, Holt-Winters, RAG, pgvector.
+
+\vspace{1.5cm}
+
+% ---------- Abstract (English) ----------
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract (English)}
+\markboth{Abstract}{Abstract}
+
+\begin{infobox}[Abstract --- English]
+Infrastructure monitoring is a strategic challenge for any organisation
+operating servers. Traditional tools such as Prometheus, Grafana or Datadog
+focus on displaying metrics, leaving engineers to manually diagnose incidents.
+This generates significant \textit{alert fatigue} and increases the mean time
+to resolution (\textsc{mttr}).
+
+This report presents \textbf{\caimp{}} (\textit{Centralized AI Monitoring
+Platform}), a self-hosted open-source platform built around an
+\textit{answers-first} philosophy: instead of graphs, the dashboard answers
+directly ``\textit{Is anything broken, and if so, why?}''
+
+The architecture uses 19 containerised microservices communicating via
+\textsc{nats} JetStream. A lightweight agent collects metrics via \textsc{otlp}
+and automatically reports system changes. A change correlation engine scores
+each anomaly against changes in the 30-minute window before it, then calls a
+local \textsc{llm} (Llama 3.1 8B via Ollama) for a plain-English explanation
+and recommended action.
+
+A Holt-Winters forecasting engine predicts resource saturation over 24 hours.
+An alert deduplication engine eliminates duplicates in a 15-minute window.
+The platform installs in under 10 minutes via Docker Compose.
+\end{infobox}
+
+\medskip
+\textbf{Keywords:} AIOps, infrastructure monitoring, microservices, large
+language model, TimescaleDB, NATS JetStream, change correlation, anomaly
+detection, Holt-Winters, RAG, pgvector.

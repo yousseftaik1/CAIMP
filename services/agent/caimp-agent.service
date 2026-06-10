@@ -1,0 +1,35 @@
+[Unit]
+Description=CAIMP v2 Server Agent
+Documentation=https://github.com/caimp/caimp
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=caimp-agent
+Group=caimp-agent
+WorkingDirectory=/opt/caimp-agent
+ExecStart=/opt/caimp-agent/venv/bin/python main.py
+Restart=on-failure
+RestartSec=10s
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/etc/caimp-agent
+PrivateTmp=yes
+CapabilityBoundingSet=
+
+# Env file (optional overrides)
+EnvironmentFile=-/etc/caimp-agent/env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=caimp-agent
+
+[Install]
+WantedBy=multi-user.target
