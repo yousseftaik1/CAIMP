@@ -25,21 +25,54 @@ Production & Docker Swarm / Kubernetes             & 16\,GB+ & High availability
 
 \section{Complete Installation Procedure}
 
-\begin{enumerate}
-  \item \textbf{Clone the repository:}
-    \texttt{git clone https://github.com/your-org/caimp.git \&\& cd caimp}
-  \item \textbf{Configure environment variables:}
-    \texttt{cp .env.example .env} — edit passwords and generate JWT\_SECRET
-    (\texttt{openssl rand -hex 64})
-  \item \textbf{Start the platform:}
-    \texttt{make up} — builds all images, runs migrations, starts all 19 services
-  \item \textbf{Pull AI models} (first run only):
-    \texttt{make pull-models} — downloads llama3.1:8b and nomic-embed-text
-  \item \textbf{Open the dashboard:} \texttt{http://localhost}\\
-    Default credentials: \texttt{admin@caimp.local} / \texttt{Admin1234!}
-  \item \textbf{Enrol a target server:} generate an enrollment token via the
-    Admin API, then run the agent on the target server.
-\end{enumerate}
+\subsection{Prerequisites}
+
+\begin{itemize}
+  \item Git ;
+  \item Docker Engine 24+ and Docker Compose v2.20+ ;
+  \item 20\,GB of free disk space (source + Docker images + AI models) ;
+  \item Internet access for the first pull of Docker images and Ollama models.
+\end{itemize}
+
+\subsection{Installation steps}
+
+\paragraph{Step 1 — Clone the repository}
+The source code is publicly available on GitHub:
+\begin{lstlisting}[language=YAML]
+git clone https://github.com/yousseftaik1/CAIMP.git
+cd CAIMP
+\end{lstlisting}
+
+\paragraph{Step 2 — Configure environment variables}
+\begin{lstlisting}[language=YAML]
+cp .env.example .env
+# Edit .env: set passwords and generate JWT_SECRET
+# JWT_SECRET: openssl rand -hex 64
+\end{lstlisting}
+
+\paragraph{Step 3 — Start the platform}
+\begin{lstlisting}[language=YAML]
+make up        # builds all custom images, runs DB migrations,
+               # starts all 19 services (pulls Ollama from Docker Hub)
+make ps        # verify every container is "healthy"
+\end{lstlisting}
+
+\noindent \texttt{make up} automatically pulls all third-party images (Ollama,
+PostgreSQL, Redis, NATS, Grafana, Prometheus, nginx) from Docker Hub on first run.
+
+\paragraph{Step 4 — Download the AI models} (first run only)
+\begin{lstlisting}[language=YAML]
+make pull-models   # downloads llama3.1:8b-instruct-q4_K_M (~4.7 GB)
+                   #          + nomic-embed-text (~270 MB)
+\end{lstlisting}
+
+\paragraph{Step 5 — Open the dashboard}
+Navigate to \texttt{http://localhost} in a browser.\\
+Default credentials: \texttt{admin@caimp.local} / \texttt{Admin1234!}
+
+\paragraph{Step 6 — Enrol a target server}
+Generate an enrollment token via the Admin \textsc{api} and run the agent
+installer on the target machine (see Section~\ref{sec:vm-monitoring}).
 
 \section{Environment Variables}
 
@@ -145,6 +178,7 @@ via the \textsc{ai} chat assistant.
 \end{table}
 
 \section{Monitoring a Real Virtual Machine}
+\label{sec:vm-monitoring}
 
 To monitor a real Linux server (systemd-based), generate an enrollment token via
 the Admin \textsc{api}, copy the agent to the target machine, and run the

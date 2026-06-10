@@ -35,44 +35,52 @@ Production & Docker Swarm / Kubernetes       & 16~Go+ & Haute disponibilité \\
 \subsection{Prérequis}
 
 \begin{itemize}
+  \item Git ;
   \item Docker Engine 24+ et Docker Compose v2.20+ ;
-  \item 20~Go d'espace disque libre ;
+  \item 20~Go d'espace disque libre (sources + images Docker + modèles \textsc{ia}) ;
   \item Accès Internet pour le premier téléchargement des images et des modèles Ollama.
 \end{itemize}
 
 \subsection{Étapes d'installation}
 
-\begin{enumerate}[leftmargin=2.2cm]
-  \item \textbf{Cloner le dépôt} :
+\paragraph{Étape 1 — Cloner le dépôt}
+Le code source est disponible publiquement sur GitHub :
 \begin{lstlisting}[language=YAML]
-git clone https://github.com/your-org/caimp.git && cd caimp
+git clone https://github.com/yousseftaik1/CAIMP.git
+cd CAIMP
 \end{lstlisting}
 
-  \item \textbf{Configurer les variables d'environnement} :
+\paragraph{Étape 2 — Configurer les variables d'environnement}
 \begin{lstlisting}[language=YAML]
 cp .env.example .env
-# Éditer .env : renseigner les mots de passe et JWT_SECRET
+# Editer .env : renseigner les mots de passe et JWT_SECRET
 # JWT_SECRET : openssl rand -hex 64
 \end{lstlisting}
 
-  \item \textbf{Démarrer la plateforme} :
+\paragraph{Étape 3 — Démarrer la plateforme}
 \begin{lstlisting}[language=YAML]
-make up               # Build + démarrage de tous les services
-make ps               # Vérifier que tout est "healthy"
+make up        # Build des images, migrations BD, démarrage des 19 services
+               # (télécharge Ollama depuis Docker Hub automatiquement)
+make ps        # Vérifier que tout est "healthy"
 \end{lstlisting}
 
-  \item \textbf{Télécharger les modèles LLM} (première exécution uniquement) :
+\noindent \texttt{make up} télécharge automatiquement toutes les images tierces
+(Ollama, PostgreSQL, Redis, NATS, Grafana, Prometheus, nginx) depuis Docker Hub
+lors de la première exécution.
+
+\paragraph{Étape 4 — Télécharger les modèles \textsc{ia}} (première exécution uniquement)
 \begin{lstlisting}[language=YAML]
-make pull-models      # llama3.1:8b-instruct-q4_K_M + nomic-embed-text
+make pull-models   # llama3.1:8b-instruct-q4_K_M (~4.7 Go)
+                   # + nomic-embed-text (~270 Mo)
 \end{lstlisting}
 
-  \item \textbf{Accéder au tableau de bord} :
-    Ouvrir \texttt{http://localhost} dans un navigateur.\\
-    Identifiants par défaut : \texttt{admin@caimp.local} / \texttt{Admin1234!}
+\paragraph{Étape 5 — Accéder au tableau de bord}
+Ouvrir \texttt{http://localhost} dans un navigateur.\\
+Identifiants par défaut : \texttt{admin@caimp.local} / \texttt{Admin1234!}
 
-  \item \textbf{Enrôler un serveur cible} : générer un jeton d'enrôlement via
-    l'\api{} Admin, puis l'exécuter sur le serveur à surveiller.
-\end{enumerate}
+\paragraph{Étape 6 — Enrôler un serveur cible}
+Générer un jeton d'enrôlement via l'\api{} Admin et exécuter le programme
+d'installation sur la machine cible (voir Section~\ref{sec:surveillance-vm}).
 
 \subsection{Configuration des variables d'environnement}
 
@@ -214,6 +222,7 @@ interrogeables via l'assistant \textsc{ia} (chatbot).
 \end{table}
 
 \section{Surveillance d'une machine virtuelle réelle}
+\label{sec:surveillance-vm}
 
 Pour surveiller un vrai serveur Linux (avec systemd), il faut générer un jeton
 d'enrôlement via l'\textsc{api} Admin, copier l'agent sur la machine cible,
