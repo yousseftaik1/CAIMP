@@ -1,3 +1,7 @@
+# Report and logos (kept locally, not in the repo)
+report/
+logos/
+
 # Secrets and local config
 .env
 *.env.local
