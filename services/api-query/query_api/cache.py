@@ -21,7 +21,7 @@ async def init_redis() -> None:
 
 async def close_redis() -> None:
     if _redis:
-        await _redis.aclose()
+        await _redis.close()
 
 
 def _cache_key(prefix: str, **kwargs) -> str:
@@ -32,11 +32,13 @@ def _cache_key(prefix: str, **kwargs) -> str:
 
 async def get_cached(prefix: str, ttl_seconds: int = 30, **kwargs):
     """Return cached JSON value or None."""
+    assert _redis is not None
     key = _cache_key(prefix, **kwargs)
     raw = await _redis.get(key)
     return json.loads(raw) if raw else None
 
 
 async def set_cached(value, prefix: str, ttl_seconds: int = 30, **kwargs) -> None:
+    assert _redis is not None
     key = _cache_key(prefix, **kwargs)
     await _redis.setex(key, ttl_seconds, json.dumps(value, default=str))

@@ -22,6 +22,7 @@ async def close_pool() -> None:
 
 @asynccontextmanager
 async def get_conn() -> AsyncGenerator[asyncpg.Connection, None]:
+    assert _pool is not None
     async with _pool.acquire() as conn:
         yield conn
 
@@ -31,6 +32,7 @@ async def get_tenant_conn(org_id: str) -> AsyncGenerator[asyncpg.Connection, Non
     """Acquire a connection with RLS org context set for the current transaction."""
     from caimp_auth.rls import set_org_context
 
+    assert _pool is not None
     async with _pool.acquire() as conn:
         async with conn.transaction():
             await set_org_context(conn, org_id)

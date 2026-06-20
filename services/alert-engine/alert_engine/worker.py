@@ -205,4 +205,4 @@ async def run(nc: NatsClient) -> None:
         ),
     )
 
-    await redis.aclose()
+    await redis.close()

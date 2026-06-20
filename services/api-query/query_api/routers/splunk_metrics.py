@@ -122,6 +122,7 @@ async def live_metric(
 
     key = f"live:{user.org_id}:{server_id}:{metric_name}"
 
+    assert _redis is not None
     async with _redis.pipeline(transaction=False) as pipe:
         pipe.get(key)
         pipe.ttl(key)

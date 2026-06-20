@@ -18,8 +18,9 @@ async def init_redis() -> None:
 
 async def close_redis() -> None:
     if _redis:
-        await _redis.aclose()
+        await _redis.close()
 
 
 def get_redis() -> aioredis.Redis:
+    assert _redis is not None
     return _redis
