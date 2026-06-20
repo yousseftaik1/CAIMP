@@ -36,7 +36,7 @@ infra/otel-collector/certs/
 # Go replace-directive local clone (generated at build/CI time)
 pgservicefile/
 
-# LaTeX build output
+# LaTeX build output (auxiliary files only — PDFs are committed)
 *.aux
 *.bbl
 *.bcf
@@ -49,4 +49,3 @@ pgservicefile/
 *.run.xml
 *.synctex.gz
 *.toc
-report/**/*.pdf
