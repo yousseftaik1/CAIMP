@@ -11,10 +11,10 @@ from jwt import PyJWTError
 
 @dataclass
 class TokenData:
-    sub: str         # user_id or server_id (UUID string)
-    org_id: str      # org_id (UUID string)
-    role: str        # admin | devops | viewer | agent
-    jti: str         # JWT ID — used for blacklisting
+    sub: str  # user_id or server_id (UUID string)
+    org_id: str  # org_id (UUID string)
+    role: str  # admin | devops | viewer | agent
+    jti: str  # JWT ID — used for blacklisting
     token_type: str  # access | refresh
 
 
@@ -59,7 +59,9 @@ def issue_refresh_token(
         "exp": now + timedelta(days=expire_days),
         "type": "refresh",
     }
-    return RefreshTokenResult(token=jwt.encode(payload, secret, algorithm="HS256"), jti=jti)
+    return RefreshTokenResult(
+        token=jwt.encode(payload, secret, algorithm="HS256"), jti=jti
+    )
 
 
 def decode_token(token: str, secret: str) -> TokenData:

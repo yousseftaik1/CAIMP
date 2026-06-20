@@ -73,7 +73,7 @@ jobs:
       # go.mod replaces pgservicefile with /pgservicefile (same as the Dockerfile).
       # Clone the current HEAD so go vet / go build can resolve the replacement.
       - name: Clone pgservicefile (replace directive dependency)
-        run: git clone --depth=1 https://github.com/jackc/pgservicefile.git /pgservicefile
+        run: sudo git clone --depth=1 https://github.com/jackc/pgservicefile.git /pgservicefile
 
       - name: go vet — telemetry-writer
         working-directory: services/telemetry-writer

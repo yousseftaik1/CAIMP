@@ -8,6 +8,7 @@ calls Ollama, and streams the response token by token.
 POST /chat  → StreamingResponse (text/event-stream)
 GET  /health
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +18,7 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from jose import JWTError, jwt
@@ -31,12 +32,12 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-DATABASE_URL  = os.environ["DATABASE_URL"]
-OLLAMA_URL    = os.environ.get("OLLAMA_URL",   "http://ollama:11434")
-OLLAMA_MODEL  = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
-JWT_SECRET    = os.environ.get("JWT_SECRET",   "")
+DATABASE_URL = os.environ["DATABASE_URL"]
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
 
-db_pool:     asyncpg.Pool | None   = None
+db_pool: asyncpg.Pool | None = None
 http_client: httpx.AsyncClient | None = None
 
 
@@ -44,10 +45,15 @@ http_client: httpx.AsyncClient | None = None
 async def lifespan(app: FastAPI):
     global db_pool, http_client
     db_pool = await asyncpg.create_pool(
-        DATABASE_URL, min_size=2, max_size=10, command_timeout=30,
+        DATABASE_URL,
+        min_size=2,
+        max_size=10,
+        command_timeout=30,
         init=lambda conn: conn.execute("SET ROLE caimp_service"),
     )
-    http_client = httpx.AsyncClient(timeout=httpx.Timeout(connect=5, read=90, write=10, pool=5))
+    http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=5, read=90, write=10, pool=5)
+    )
     log.info("AI Orchestrator started (chat mode)")
     yield
     await db_pool.close()
@@ -55,10 +61,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CAIMP AI Orchestrator", version="2.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
 
 
 # ── Auth helper ───────────────────────────────────────────────────────────────
+
 
 def _get_org(authorization: str | None) -> str | None:
     if not authorization or not authorization.startswith("Bearer "):
@@ -72,13 +81,14 @@ def _get_org(authorization: str | None) -> str | None:
 
 # ── Chat request model ────────────────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
-    message:              str
-    host_hint:            str | None  = None
-    org_id:               str | None  = None   # sent by the frontend as fallback
+    message: str
+    host_hint: str | None = None
+    org_id: str | None = None  # sent by the frontend as fallback
     # frontend calls this field conversation_history; accept both names
-    history:              list[dict]  = []
-    conversation_history: list[dict]  = []
+    history: list[dict] = []
+    conversation_history: list[dict] = []
 
     def effective_history(self) -> list[dict]:
         return self.history or self.conversation_history
@@ -86,9 +96,10 @@ class ChatRequest(BaseModel):
 
 # ── Chat endpoint ─────────────────────────────────────────────────────────────
 
+
 @app.post("/chat")
 async def chat(
-    req:           ChatRequest,
+    req: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
     """
@@ -105,8 +116,10 @@ async def chat(
         raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
 
     intent, entities = classify_intent(req.message, req.host_hint)
-    context = await gather_chat_context(intent, entities, org_id or "", db_pool, splunk=None)
-    prompt  = build_chat_prompt(req.message, req.effective_history(), context, intent)
+    context = await gather_chat_context(
+        intent, entities, org_id or "", db_pool, splunk=None
+    )
+    prompt = build_chat_prompt(req.message, req.effective_history(), context, intent)
 
     async def event_stream():
         yield f'data: {{"type":"intent","intent":"{intent}"}}\n\n'
@@ -117,7 +130,9 @@ async def chat(
 
         async def _feed() -> None:
             try:
-                async for token in stream_ollama(prompt, http_client, OLLAMA_URL, OLLAMA_MODEL):
+                async for token in stream_ollama(
+                    prompt, http_client, OLLAMA_URL, OLLAMA_MODEL
+                ):
                     await q.put(token)
             finally:
                 await q.put(None)  # sentinel
@@ -128,7 +143,7 @@ async def chat(
                 try:
                     token = await asyncio.wait_for(q.get(), timeout=5.0)
                 except asyncio.TimeoutError:
-                    yield ': keep-alive\n\n'
+                    yield ": keep-alive\n\n"
                     continue
                 if token is None:
                     break

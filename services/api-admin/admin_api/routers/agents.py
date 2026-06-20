@@ -39,11 +39,18 @@ async def enroll_agent(body: EnrollRequest):
             body.token,
         )
         if not tok:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid enrollment token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid enrollment token",
+            )
         if tok["used_at"] is not None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token already used")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Token already used"
+            )
         if tok["expires_at"] < datetime.now(tz=timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+            )
 
         server_id = str(tok["server_id"])
         org_id = str(tok["org_id"])
@@ -52,7 +59,10 @@ async def enroll_agent(body: EnrollRequest):
             "SELECT cert_pem, encrypted_key FROM ca_config ORDER BY created_at DESC LIMIT 1"
         )
         if not ca_row:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="CA not initialised")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="CA not initialised",
+            )
 
         ca_mgr = CAManager(settings.ca_key_passphrase)
         cert_pem, serial_hex, fingerprint = ca_mgr.sign_csr(
@@ -68,35 +78,53 @@ async def enroll_agent(body: EnrollRequest):
             await conn.execute(
                 "INSERT INTO agent_certs (server_id, org_id, cert_pem, serial_number, fingerprint, expires_at) "
                 "VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)",
-                server_id, org_id, cert_pem, serial_hex, fingerprint, expires_at,
+                server_id,
+                org_id,
+                cert_pem,
+                serial_hex,
+                fingerprint,
+                expires_at,
             )
             await conn.execute(
                 "UPDATE enrollment_tokens SET used_at = now() WHERE token = $1",
                 body.token,
             )
 
-    return EnrollResponse(cert_pem=cert_pem, ca_cert_pem=ca_row["cert_pem"], expires_at=expires_at.isoformat())
+    return EnrollResponse(
+        cert_pem=cert_pem,
+        ca_cert_pem=ca_row["cert_pem"],
+        expires_at=expires_at.isoformat(),
+    )
 
 
 @router.post("/auth/token", response_model=AgentTokenResponse)
-async def agent_auth_token(x_client_cert: str | None = Header(default=None, alias="X-Client-Cert")):
+async def agent_auth_token(
+    x_client_cert: str | None = Header(default=None, alias="X-Client-Cert"),
+):
     """
     Exchange an mTLS client certificate for a JWT.
     nginx must forward the verified PEM via the X-Client-Cert header.
     """
     if not x_client_cert:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No client certificate")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="No client certificate"
+        )
 
     cert_pem = unquote(x_client_cert)
     ca_mgr = CAManager(settings.ca_key_passphrase)
 
     spiffe_uri = ca_mgr.extract_spiffe_san(cert_pem)
     if not spiffe_uri:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No SPIFFE SAN in certificate")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No SPIFFE SAN in certificate",
+        )
 
     parsed = ca_mgr.parse_spiffe_uri(spiffe_uri)
     if not parsed:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed SPIFFE URI")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed SPIFFE URI"
+        )
 
     org_id, server_id = parsed
 
@@ -105,19 +133,27 @@ async def agent_auth_token(x_client_cert: str | None = Header(default=None, alia
             "SELECT revoked_at FROM agent_certs "
             "WHERE server_id = $1::uuid AND org_id = $2::uuid "
             "ORDER BY issued_at DESC LIMIT 1",
-            server_id, org_id,
+            server_id,
+            org_id,
         )
         if not cert_row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Certificate not found")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Certificate not found"
+            )
         if cert_row["revoked_at"]:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Certificate revoked")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Certificate revoked"
+            )
 
         revoked = await conn.fetchrow(
             "SELECT id FROM revoked_agents WHERE server_id = $1::uuid AND org_id = $2::uuid",
-            server_id, org_id,
+            server_id,
+            org_id,
         )
         if revoked:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Agent revoked")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Agent revoked"
+            )
 
     token = issue_access_token(
         user_id=server_id,

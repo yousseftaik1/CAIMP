@@ -7,6 +7,7 @@ Two query methods:
   run_search_oneshot() — single export request, no polling.
                          Faster for simple queries; use for context builder SPL.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -31,8 +32,8 @@ class SplunkClient:
         password: str,
         verify_tls: bool = False,
     ) -> None:
-        self.base   = host.rstrip("/")
-        self.auth   = (username, password)
+        self.base = host.rstrip("/")
+        self.auth = (username, password)
         self.client = httpx.AsyncClient(
             verify=verify_tls,
             timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
@@ -58,16 +59,15 @@ class SplunkClient:
             f"{self.base}/services/search/jobs",
             auth=self.auth,
             data={
-                "search":        spl,
+                "search": spl,
                 "earliest_time": earliest,
-                "latest_time":   latest,
-                "output_mode":   "json",
+                "latest_time": latest,
+                "output_mode": "json",
             },
         )
         if create_resp.status_code != 201:
             raise SplunkQueryError(
-                f"Job create failed {create_resp.status_code}: "
-                f"{create_resp.text[:200]}"
+                f"Job create failed {create_resp.status_code}: {create_resp.text[:200]}"
             )
         sid = create_resp.json()["sid"]
 
@@ -96,9 +96,7 @@ class SplunkClient:
             params={"output_mode": "json", "count": count},
         )
         if results_resp.status_code != 200:
-            raise SplunkQueryError(
-                f"Result fetch failed {results_resp.status_code}"
-            )
+            raise SplunkQueryError(f"Result fetch failed {results_resp.status_code}")
         return results_resp.json().get("results", [])
 
     # ── oneshot export ────────────────────────────────────────────────────────
@@ -118,11 +116,11 @@ class SplunkClient:
             f"{self.base}/services/search/jobs/export",
             auth=self.auth,
             data={
-                "search":        spl,
+                "search": spl,
                 "earliest_time": earliest,
-                "latest_time":   latest,
-                "output_mode":   "json",
-                "count":         count,
+                "latest_time": latest,
+                "output_mode": "json",
+                "count": count,
             },
         )
         if resp.status_code not in (200, 204):
@@ -151,9 +149,9 @@ class SplunkClient:
         Returns empty dict if no baseline exists yet for this host+metric.
         """
         results = await self.run_search_oneshot(
-            f'| inputlookup caimp_baselines '
+            f"| inputlookup caimp_baselines "
             f'WHERE host="{host}" metric_name="{metric_name}" '
-            f'| head 1',
+            f"| head 1",
             earliest="-1m",
             latest="now",
         )

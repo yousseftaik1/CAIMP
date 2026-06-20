@@ -54,6 +54,7 @@ async def _get_pool() -> asyncpg.Pool:
 async def get_tenant_conn(org_id: str) -> AsyncGenerator[asyncpg.Connection, None]:
     """Read-only tenant connection with RLS context set."""
     from caimp_auth.rls import set_org_context
+
     pool = await _get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():

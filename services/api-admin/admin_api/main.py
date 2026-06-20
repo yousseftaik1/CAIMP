@@ -40,7 +40,9 @@ async def _ensure_ca() -> None:
     async with get_conn() as conn:
         await conn.execute(
             "INSERT INTO ca_config (cert_pem, encrypted_key, expires_at) VALUES ($1, $2, $3)",
-            cert_pem, encrypted_key, expires_at,
+            cert_pem,
+            encrypted_key,
+            expires_at,
         )
     log.info("Root CA generated and stored in database")
 

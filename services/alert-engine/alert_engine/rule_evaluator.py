@@ -13,9 +13,9 @@ from .config import settings
 log = logging.getLogger(__name__)
 
 _OPS: dict[str, Any] = {
-    ">":  op.gt,
+    ">": op.gt,
     ">=": op.ge,
-    "<":  op.lt,
+    "<": op.lt,
     "<=": op.le,
     "==": op.eq,
 }
@@ -70,14 +70,16 @@ class RuleEvaluator:
             cooldown_ttl = int(rule["cooldown_minutes"]) * 60
             await self._redis.setex(cooldown_key, cooldown_ttl, "1")
 
-            fired.append({
-                "rule": rule,
-                "metric_name": metric_name,
-                "value": value,
-                "threshold": threshold,
-                "server_id": server_id,
-                "org_id": org_id,
-            })
+            fired.append(
+                {
+                    "rule": rule,
+                    "metric_name": metric_name,
+                    "value": value,
+                    "threshold": threshold,
+                    "server_id": server_id,
+                    "org_id": org_id,
+                }
+            )
 
         return fired
 
@@ -118,6 +120,7 @@ class RuleEvaluator:
             "WHERE org_id = $1::uuid AND server_id = $2::uuid "
             "AND time > now() - INTERVAL '5 minutes' "
             "ORDER BY metric_name, time DESC",
-            org_id, server_id,
+            org_id,
+            server_id,
         )
         return {r["metric_name"]: r["value"] for r in rows}

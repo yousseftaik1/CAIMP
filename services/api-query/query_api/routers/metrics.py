@@ -14,8 +14,12 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 _VALID_INTERVALS = {"1m", "5m", "15m", "1h", "6h", "1d"}
 _INTERVAL_SQL = {
-    "1m": "1 minute", "5m": "5 minutes", "15m": "15 minutes",
-    "1h": "1 hour", "6h": "6 hours", "1d": "1 day",
+    "1m": "1 minute",
+    "5m": "5 minutes",
+    "15m": "15 minutes",
+    "1h": "1 hour",
+    "6h": "6 hours",
+    "1d": "1 day",
 }
 
 
@@ -53,8 +57,13 @@ async def query_metrics(
     t_from = from_time or (now - timedelta(hours=1))
 
     cached = await get_cached(
-        "metrics", server_id=server_id, metric_name=metric_name,
-        from_time=t_from, to_time=t_to, interval=interval, agg=agg,
+        "metrics",
+        server_id=server_id,
+        metric_name=metric_name,
+        from_time=t_from,
+        to_time=t_to,
+        interval=interval,
+        agg=agg,
     )
     if cached:
         return cached
@@ -67,8 +76,13 @@ async def query_metrics(
             "ORDER BY time DESC LIMIT 5000"
         )
         async with get_tenant_conn(user.org_id) as conn:
-            rows = await conn.fetch(q, user.org_id, server_id, metric_name, t_from, t_to)
-        result = [{"time": r["time"], "metric_name": r["metric_name"], "value": r["value"]} for r in rows]
+            rows = await conn.fetch(
+                q, user.org_id, server_id, metric_name, t_from, t_to
+            )
+        result = [
+            {"time": r["time"], "metric_name": r["metric_name"], "value": r["value"]}
+            for r in rows
+        ]
     else:
         bucket_expr = f"time_bucket('{_INTERVAL_SQL[interval]}', time)"
         q = (
@@ -81,17 +95,33 @@ async def query_metrics(
             "ORDER BY time DESC"
         )
         async with get_tenant_conn(user.org_id) as conn:
-            rows = await conn.fetch(q, user.org_id, server_id, metric_name, t_from, t_to)
+            rows = await conn.fetch(
+                q, user.org_id, server_id, metric_name, t_from, t_to
+            )
         result = [
-            {"time": r["time"], "metric_name": r["metric_name"],
-             "value": r[agg], "avg": r["avg"], "max": r["max"], "min": r["min"]}
+            {
+                "time": r["time"],
+                "metric_name": r["metric_name"],
+                "value": r[agg],
+                "avg": r["avg"],
+                "max": r["max"],
+                "min": r["min"],
+            }
             for r in rows
         ]
 
     ttl = 30 if (now - t_to).total_seconds() < 300 else 300
-    await set_cached(result, "metrics", ttl_seconds=ttl,
-                     server_id=server_id, metric_name=metric_name,
-                     from_time=t_from, to_time=t_to, interval=interval, agg=agg)
+    await set_cached(
+        result,
+        "metrics",
+        ttl_seconds=ttl,
+        server_id=server_id,
+        metric_name=metric_name,
+        from_time=t_from,
+        to_time=t_to,
+        interval=interval,
+        agg=agg,
+    )
     return result
 
 
@@ -123,9 +153,15 @@ async def latest_metrics(
             rows = await conn.fetch(q, user.org_id)
 
     result = [
-        {"server_id": str(r["server_id"]), "metric_name": r["metric_name"],
-         "value": r["value"], "time": r["time"]}
+        {
+            "server_id": str(r["server_id"]),
+            "metric_name": r["metric_name"],
+            "value": r["value"],
+            "time": r["time"],
+        }
         for r in rows
     ]
-    await set_cached(result, "latest", ttl_seconds=15, org_id=user.org_id, server_id=server_id)
+    await set_cached(
+        result, "latest", ttl_seconds=15, org_id=user.org_id, server_id=server_id
+    )
     return result

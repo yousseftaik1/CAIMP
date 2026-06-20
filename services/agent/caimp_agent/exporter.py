@@ -9,10 +9,8 @@ a background task drains the buffer whenever the endpoint comes back.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
-from typing import Sequence
 
 import grpc
 from opentelemetry.sdk.metrics.export import (
@@ -33,6 +31,7 @@ log = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _metrics_data_to_records(data: MetricsData) -> list[dict]:
     """Convert MetricsData to a list of dicts for buffer storage."""
     records = []
@@ -42,9 +41,7 @@ def _metrics_data_to_records(data: MetricsData) -> list[dict]:
             for metric in sm.metrics:
                 data_points = []
                 # Handle gauge / sum / histogram
-                src = (
-                    getattr(metric, "data", None)
-                )
+                src = getattr(metric, "data", None)
                 if src is not None:
                     raw_points = getattr(src, "data_points", [])
                     for dp in raw_points:
@@ -55,21 +52,24 @@ def _metrics_data_to_records(data: MetricsData) -> list[dict]:
                         }
                         data_points.append(point)
 
-                records.append({
-                    "resource_attributes": resource_attrs,
-                    "scope": sm.scope.name if sm.scope else "",
-                    "name": metric.name,
-                    "unit": metric.unit,
-                    "description": metric.description,
-                    "data_points": data_points,
-                    "captured_at": time.time(),
-                })
+                records.append(
+                    {
+                        "resource_attributes": resource_attrs,
+                        "scope": sm.scope.name if sm.scope else "",
+                        "name": metric.name,
+                        "unit": metric.unit,
+                        "description": metric.description,
+                        "data_points": data_points,
+                        "captured_at": time.time(),
+                    }
+                )
     return records
 
 
 # ---------------------------------------------------------------------------
 # Buffered exporter
 # ---------------------------------------------------------------------------
+
 
 class BufferedOTLPExporter(MetricExporter):
     """
@@ -82,7 +82,7 @@ class BufferedOTLPExporter(MetricExporter):
         otlp_exporter: OTLPMetricExporter,
         buffer: SQLiteBuffer,
     ) -> None:
-        self._otlp   = otlp_exporter
+        self._otlp = otlp_exporter
         self._buffer = buffer
         self._online = True
 
@@ -95,9 +95,9 @@ class BufferedOTLPExporter(MetricExporter):
     ) -> "BufferedOTLPExporter":
         """Build the exporter with mTLS channel credentials + JWT call credentials."""
         if cfg.use_tls and cfg.cert_path.exists() and cfg.ca_path.exists():
-            ca_cert     = cfg.ca_path.read_bytes()
+            ca_cert = cfg.ca_path.read_bytes()
             client_cert = cfg.cert_path.read_bytes()
-            client_key  = cfg.key_path.read_bytes()
+            client_key = cfg.key_path.read_bytes()
 
             ssl_creds = grpc.ssl_channel_credentials(
                 root_certificates=ca_cert,
@@ -167,6 +167,7 @@ class BufferedOTLPExporter(MetricExporter):
 # Background replay task
 # ---------------------------------------------------------------------------
 
+
 async def buffer_replay_loop(
     exporter: OTLPMetricExporter,
     buffer: SQLiteBuffer,
@@ -187,6 +188,7 @@ async def buffer_replay_loop(
             #  Telemetry Writer's REST fallback instead)
             try:
                 import requests as req
+
                 http_endpoint = exporter._endpoint.replace(":4317", ":4318")
                 resp = req.post(
                     f"{http_endpoint}/v1/metrics/raw",

@@ -26,6 +26,7 @@ from nats_client.models import (
 # Unit tests — no NATS required
 # ---------------------------------------------------------------------------
 
+
 class TestSubjects:
     def test_metric_received(self):
         s = Subjects.metric_received("org-1", "srv-1")
@@ -86,6 +87,7 @@ class TestModels:
 # Integration tests — require live NATS
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.integration
 class TestNatsClientIntegration:
     @pytest.fixture
@@ -99,9 +101,9 @@ class TestNatsClientIntegration:
         from nats_client.client import NatsClient
         from nats_client.models import AnomalyEvent
 
-        org_id    = str(uuid4())
+        org_id = str(uuid4())
         server_id = str(uuid4())
-        incident  = str(uuid4())
+        incident = str(uuid4())
 
         event = AnomalyEvent(
             incident_id=incident,
@@ -136,9 +138,9 @@ class TestNatsClientIntegration:
         from nats_client.client import NatsClient
         from nats_client.models import AnomalyEvent
 
-        org_id   = str(uuid4())
+        org_id = str(uuid4())
         incident = str(uuid4())
-        subject  = Subjects.anomaly_detected(org_id, "critical")
+        subject = Subjects.anomaly_detected(org_id, "critical")
         consumer = f"durable-test-{uuid4()}"
 
         event = AnomalyEvent(

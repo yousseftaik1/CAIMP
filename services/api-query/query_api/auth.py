@@ -1,4 +1,5 @@
 """FastAPI auth dependencies for the Query API."""
+
 from __future__ import annotations
 
 from fastapi import Depends, HTTPException, status
@@ -23,5 +24,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
     if token_data.token_type != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required"
+        )
     return token_data

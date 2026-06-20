@@ -29,12 +29,14 @@ _FETCH_BATCH = 10
 def _fallback_explanation(event) -> tuple[str, str, str]:
     """Generate a readable templated explanation when the LLM is unavailable."""
     ml_map = {
-        "system.cpu.utilization":        "CPU",
-        "system.memory.utilization":     "memory (RAM)",
+        "system.cpu.utilization": "CPU",
+        "system.memory.utilization": "memory (RAM)",
         "system.filesystem.utilization": "disk space",
     }
-    ml      = ml_map.get(event.metric_name, event.metric_name.split(".")[-1])
-    val_pct = f"{event.value * 100:.0f}%" if event.value <= 1.0 else f"{event.value:.0f}%"
+    ml = ml_map.get(event.metric_name, event.metric_name.split(".")[-1])
+    val_pct = (
+        f"{event.value * 100:.0f}%" if event.value <= 1.0 else f"{event.value:.0f}%"
+    )
 
     if event.severity == "critical":
         explanation = (
@@ -83,7 +85,9 @@ async def _process_one(
         "WHERE org_id = $1::uuid AND server_id = $2::uuid AND metric_name = $3 "
         "AND time > now() - INTERVAL '30 minutes' "
         "ORDER BY time DESC LIMIT 60",
-        event.org_id, event.server_id, event.metric_name,
+        event.org_id,
+        event.server_id,
+        event.metric_name,
     )
     history = [{"time": str(r["time"]), "value": r["value"]} for r in history_rows]
 
@@ -118,9 +122,15 @@ async def _process_one(
                (org_id, server_id, incident_id, anomaly_type, severity,
                 explanation, root_cause, recommended_action, confidence, model)
            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)""",
-        event.org_id, event.server_id, event.incident_id,
-        event.metric_name, event.severity,
-        explanation, root_cause, recommended_action, confidence,
+        event.org_id,
+        event.server_id,
+        event.incident_id,
+        event.metric_name,
+        event.severity,
+        explanation,
+        root_cause,
+        recommended_action,
+        confidence,
         settings.llm_model,
     )
 
@@ -151,7 +161,9 @@ async def _process_one(
     _processed.labels(status="ok").inc()
     log.info(
         "Explained incident=%s server=%s confidence=%s",
-        event.incident_id, event.server_id, confidence,
+        event.incident_id,
+        event.server_id,
+        confidence,
     )
 
 

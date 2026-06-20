@@ -10,7 +10,6 @@ from nats_client.client import NatsClient
 from nats_client.models import ForecastCritical, Subjects
 
 from .config import settings
-from .db import get_pool
 from .evaluator import evaluate_past_forecasts
 from .forecaster import forecast_metric
 from .ollama_client import generate_narrative
@@ -18,8 +17,8 @@ from .ollama_client import generate_narrative
 log = logging.getLogger(__name__)
 
 _CRITICAL_WINDOW_HOURS = 6.0
-_FORECAST_METRICS      = ["cpu_percent", "memory_percent", "disk_percent"]
-_HISTORY_HOURS         = 72
+_FORECAST_METRICS = ["cpu_percent", "memory_percent", "disk_percent"]
+_HISTORY_HOURS = 72
 
 
 async def _forecast_one(
@@ -41,18 +40,26 @@ async def _forecast_one(
         GROUP BY 1
         ORDER BY 1 ASC
         """,
-        org_id, server_id, metric_name, str(_HISTORY_HOURS),
+        org_id,
+        server_id,
+        metric_name,
+        str(_HISTORY_HOURS),
     )
 
     values = [float(r["avg_val"]) for r in history_rows]
     if len(values) < settings.min_data_points:
         log.debug(
             "Skipping %s/%s — %d hourly points (need %d)",
-            server_id, metric_name, len(values), settings.min_data_points,
+            server_id,
+            metric_name,
+            len(values),
+            settings.min_data_points,
         )
         return
 
-    result = forecast_metric(values, settings.forecast_horizon_hours, settings.critical_threshold)
+    result = forecast_metric(
+        values, settings.forecast_horizon_hours, settings.critical_threshold
+    )
     if not result.points:
         return
 
@@ -66,7 +73,8 @@ async def _forecast_one(
           AND accuracy_score IS NOT NULL
           AND forecasted_at > now() - INTERVAL '7 days'
         """,
-        server_id, metric_name,
+        server_id,
+        metric_name,
     )
 
     narrative, llm_confidence = await generate_narrative(
@@ -87,14 +95,24 @@ async def _forecast_one(
         ) VALUES ($1::uuid, $2::uuid, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11)
         RETURNING id
         """,
-        org_id, server_id, metric_name, settings.forecast_horizon_hours,
-        json.dumps(result.points), result.time_to_critical,
-        settings.critical_threshold, result.trend_slope,
-        "holt_linear", narrative, llm_confidence,
+        org_id,
+        server_id,
+        metric_name,
+        settings.forecast_horizon_hours,
+        json.dumps(result.points),
+        result.time_to_critical,
+        settings.critical_threshold,
+        result.trend_slope,
+        "holt_linear",
+        narrative,
+        llm_confidence,
     )
     forecast_id = str(row["id"])
 
-    if result.time_to_critical is not None and result.time_to_critical <= _CRITICAL_WINDOW_HOURS:
+    if (
+        result.time_to_critical is not None
+        and result.time_to_critical <= _CRITICAL_WINDOW_HOURS
+    ):
         event = ForecastCritical(
             forecast_id=forecast_id,
             org_id=org_id,
@@ -118,14 +136,21 @@ async def _forecast_one(
 
         log.warning(
             "CRITICAL FORECAST server=%s metric=%s ttc=%.1fh trend=%+.4f",
-            server_id, metric_name, result.time_to_critical, result.trend_slope,
+            server_id,
+            metric_name,
+            result.time_to_critical,
+            result.trend_slope,
         )
     else:
         log.info(
             "Forecast saved server=%s metric=%s trend=%+.4f ttc=%s accuracy_ctx=%s",
-            server_id, metric_name, result.trend_slope,
+            server_id,
+            metric_name,
+            result.trend_slope,
             f"{result.time_to_critical:.1f}h" if result.time_to_critical else "none",
-            f"{past_accuracy * 100:.0f}%" if past_accuracy is not None else "no-history",
+            f"{past_accuracy * 100:.0f}%"
+            if past_accuracy is not None
+            else "no-history",
         )
 
 
@@ -143,9 +168,9 @@ async def _run_all_forecasts(pool, redis: aioredis.Redis, nc: NatsClient) -> Non
     log.info("Running forecasts for %d server-metric pair(s)", len(active))
 
     for row in active:
-        org_id    = str(row["org_id"])
+        org_id = str(row["org_id"])
         server_id = str(row["server_id"])
-        metric    = row["metric_name"]
+        metric = row["metric_name"]
 
         dedup_key = f"forecast:interval:{server_id}:{metric}"
         if await redis.exists(dedup_key):
@@ -155,7 +180,10 @@ async def _run_all_forecasts(pool, redis: aioredis.Redis, nc: NatsClient) -> Non
             await _forecast_one(pool, redis, nc, org_id, server_id, metric)
         except Exception as exc:
             log.error(
-                "Forecast error server=%s metric=%s: %s", server_id, metric, exc,
+                "Forecast error server=%s metric=%s: %s",
+                server_id,
+                metric,
+                exc,
                 exc_info=True,
             )
 

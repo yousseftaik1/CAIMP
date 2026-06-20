@@ -5,16 +5,21 @@ Target audience: startup developers without DevOps background.
 The LLM should explain incidents like a senior engineer talking to a first-time
 server owner — honest, direct, jargon-free, and always ending with a concrete action.
 """
+
 from __future__ import annotations
 
 # ── Anomaly type metadata ─────────────────────────────────────────────────────
 
 ANOMALY_TYPE_LABELS: dict[str, tuple[str, str, str]] = {
-    "cpu_saturation":  ("CPU spike",         "system.cpu.utilization",      "cpu_pct"),
-    "memory_pressure": ("memory problem",    "system.memory.utilization",   "mem_pct"),
-    "disk_fill":       ("disk running full", "system.disk.utilization",     "disk_pct"),
-    "network_anomaly": ("unusual network activity", "system.network.io.bytes_recv", "net_bytes"),
-    "security_event":  ("possible security issue", "various",               "value"),
+    "cpu_saturation": ("CPU spike", "system.cpu.utilization", "cpu_pct"),
+    "memory_pressure": ("memory problem", "system.memory.utilization", "mem_pct"),
+    "disk_fill": ("disk running full", "system.disk.utilization", "disk_pct"),
+    "network_anomaly": (
+        "unusual network activity",
+        "system.network.io.bytes_recv",
+        "net_bytes",
+    ),
+    "security_event": ("possible security issue", "various", "value"),
 }
 
 # ── Plain-language focus hints ────────────────────────────────────────────────
@@ -79,6 +84,7 @@ Respond ONLY with this JSON object — no preamble, no markdown fences, no extra
 
 # ── Prompt assembly ───────────────────────────────────────────────────────────
 
+
 def build_prompt(anomaly: dict, context: dict, rag: dict) -> str:
     atype = anomaly.get("anomaly_type", "unknown")
     label, _, _ = ANOMALY_TYPE_LABELS.get(
@@ -87,7 +93,7 @@ def build_prompt(anomaly: dict, context: dict, rag: dict) -> str:
     focus = _FOCUS_HINTS.get(atype, _DEFAULT_FOCUS)
     value = anomaly.get("value", 0)
     score = anomaly.get("score", 0)
-    host  = anomaly.get("host", "your server")
+    host = anomaly.get("host", "your server")
 
     return f"""\
 A small team's server just triggered a {label} alert. \
@@ -97,41 +103,45 @@ Your job is to explain what happened and what the developer should do — in pla
 
 === WHAT TRIGGERED THIS ALERT ===
 Server:     {host}
-Metric:     {anomaly.get('metric_name', 'unknown')} = {value:.1f}%
-Severity:   {anomaly.get('severity', 'unknown').upper()}
-Detected:   {anomaly.get('timestamp', 'unknown')}
+Metric:     {anomaly.get("metric_name", "unknown")} = {value:.1f}%
+Severity:   {anomaly.get("severity", "unknown").upper()}
+Detected:   {anomaly.get("timestamp", "unknown")}
 MLTK score: {score:.4f}  (lower = more anomalous)
 Type:       {atype}
 
 === WHAT THE METRIC HAS BEEN DOING (last 60 minutes) ===
-{context.get('metric_trend_text', '  (data unavailable)')}
+{context.get("metric_trend_text", "  (data unavailable)")}
 
 === OTHER METRICS AT THE SAME TIME (CPU + memory + disk) ===
-{context.get('correlated_metrics_text', '  (data unavailable)')}
+{context.get("correlated_metrics_text", "  (data unavailable)")}
 
 === ERROR MESSAGES FROM THE SERVER (last 1 hour) ===
-{context.get('error_logs_text', '  (none found)')}
+{context.get("error_logs_text", "  (none found)")}
 
 === PREVIOUS PROBLEMS ON THIS SERVER (last 7 days) ===
-{context.get('past_anomalies_text', '  (none recorded)')}
+{context.get("past_anomalies_text", "  (none recorded)")}
 
 === WHAT THE AI SAID LAST TIME SOMETHING SIMILAR HAPPENED ===
-{context.get('ai_history_text', '  (no history)')}
+{context.get("ai_history_text", "  (no history)")}
 
 === SIMILAR INCIDENTS FROM THE TEAM'S KNOWLEDGE BASE ===
-{rag.get('similar_incidents_text', '  (none)')}
+{rag.get("similar_incidents_text", "  (none)")}
 
 === FIX GUIDES (runbooks) ===
-{rag.get('runbook_text', '  (none)')}
+{rag.get("runbook_text", "  (none)")}
 
 {OUTPUT_SCHEMA}"""
 
 
 if __name__ == "__main__":
     _test = {
-        "host": "web-01", "metric_name": "system.cpu.utilization", "value": 97.3,
-        "score": 0.0012, "timestamp": "2026-05-20T10:00:00Z",
-        "severity": "critical", "anomaly_type": "cpu_saturation",
+        "host": "web-01",
+        "metric_name": "system.cpu.utilization",
+        "value": 97.3,
+        "score": 0.0012,
+        "timestamp": "2026-05-20T10:00:00Z",
+        "severity": "critical",
+        "anomaly_type": "cpu_saturation",
         "org_id": "00000000-0000-0000-0000-000000000001",
     }
     _ctx = {

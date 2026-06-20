@@ -36,13 +36,19 @@ async def login(body: LoginRequest):
             body.email,
         )
     if not row or not verify_password(body.password, row["password_hash"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
 
     user_id = str(row["id"])
     org_id = str(row["org_id"])
 
     access_token = issue_access_token(
-        user_id, org_id, row["role"], settings.jwt_secret, settings.jwt_access_expire_minutes
+        user_id,
+        org_id,
+        row["role"],
+        settings.jwt_secret,
+        settings.jwt_access_expire_minutes,
     )
     refresh_result = issue_refresh_token(
         user_id, org_id, settings.jwt_secret, settings.jwt_refresh_expire_days
@@ -62,27 +68,45 @@ async def refresh(body: RefreshRequest):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
 
     if token_data.token_type != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required"
+        )
 
     redis = get_redis()
     if not await redis.get(f"rt:{token_data.jti}"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked or expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked or expired"
+        )
 
     async with get_conn() as conn:
-        row = await conn.fetchrow("SELECT role FROM users WHERE id = $1::uuid", token_data.sub)
+        row = await conn.fetchrow(
+            "SELECT role FROM users WHERE id = $1::uuid", token_data.sub
+        )
     if not row:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
 
     await redis.delete(f"rt:{token_data.jti}")
 
     access_token = issue_access_token(
-        token_data.sub, token_data.org_id, row["role"],
-        settings.jwt_secret, settings.jwt_access_expire_minutes,
+        token_data.sub,
+        token_data.org_id,
+        row["role"],
+        settings.jwt_secret,
+        settings.jwt_access_expire_minutes,
     )
     refresh_result = issue_refresh_token(
-        token_data.sub, token_data.org_id, settings.jwt_secret, settings.jwt_refresh_expire_days
+        token_data.sub,
+        token_data.org_id,
+        settings.jwt_secret,
+        settings.jwt_refresh_expire_days,
     )
-    await redis.setex(f"rt:{refresh_result.jti}", settings.jwt_refresh_expire_days * 86400, token_data.sub)
+    await redis.setex(
+        f"rt:{refresh_result.jti}",
+        settings.jwt_refresh_expire_days * 86400,
+        token_data.sub,
+    )
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_result.token)
 

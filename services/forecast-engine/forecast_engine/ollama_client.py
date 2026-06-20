@@ -44,15 +44,11 @@ async def generate_narrative(
     critical_clause = ""
     if result.time_to_critical is not None:
         ttc = int(result.time_to_critical)
-        critical_clause = (
-            f" CRITICAL: expected to breach {_pct(critical_threshold)} in ~{ttc} hour(s)."
-        )
+        critical_clause = f" CRITICAL: expected to breach {_pct(critical_threshold)} in ~{ttc} hour(s)."
 
     accuracy_clause = ""
     if past_accuracy is not None:
-        accuracy_clause = (
-            f" Historical 7-day forecast accuracy for this metric: {past_accuracy * 100:.0f}%."
-        )
+        accuracy_clause = f" Historical 7-day forecast accuracy for this metric: {past_accuracy * 100:.0f}%."
 
     prompt = (
         "You are a predictive monitoring AI. Summarise the following metric forecast.\n\n"
@@ -85,8 +81,8 @@ async def generate_narrative(
             resp.raise_for_status()
             raw = resp.json()["response"]
 
-        parsed     = json.loads(raw)
-        narrative  = (parsed.get("narrative") or "").strip()[:1000]
+        parsed = json.loads(raw)
+        narrative = (parsed.get("narrative") or "").strip()[:1000]
         confidence = parsed.get("confidence", result.confidence)
         if confidence not in ("low", "medium", "high"):
             confidence = result.confidence
@@ -96,7 +92,9 @@ async def generate_narrative(
 
     except Exception as exc:
         log.warning("LLM narrative failed for %s/%s: %s", server_id, metric_name, exc)
-        return _fallback(metric_name, current, direction, result, critical_threshold), result.confidence
+        return _fallback(
+            metric_name, current, direction, result, critical_threshold
+        ), result.confidence
 
 
 def _fallback(
@@ -116,7 +114,9 @@ def _fallback(
 
 async def is_ready() -> bool:
     try:
-        async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=5.0) as client:
+        async with httpx.AsyncClient(
+            base_url=settings.ollama_base_url, timeout=5.0
+        ) as client:
             resp = await client.get("/")
             return resp.status_code == 200
     except Exception:

@@ -5,17 +5,19 @@ Only implements what the metrics router needs: oneshot mstats export.
 For the full Splunk client (two-phase search, KV Store baselines) see
 services/ai-orchestrator/splunk_client.py.
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 import httpx
 
 log = logging.getLogger(__name__)
 
 # ── index / span auto-selection ───────────────────────────────────────────────
+
 
 def select_index_and_span(hours: float) -> tuple[str, str]:
     """
@@ -41,14 +43,15 @@ def _val_field(index: str) -> str:
 
 # ── client ────────────────────────────────────────────────────────────────────
 
+
 class SplunkMetricsClient:
     """Thin httpx wrapper for Splunk metric queries."""
 
     def __init__(
         self,
-        host:       str,
-        username:   str,
-        password:   str,
+        host: str,
+        username: str,
+        password: str,
         verify_tls: bool = False,
     ) -> None:
         self._base = f"https://{host}:8089"
@@ -61,24 +64,24 @@ class SplunkMetricsClient:
     async def query_metrics(
         self,
         metric_name: str,
-        host:        str,
-        org_id:      str,
-        index:       str,
-        span:        str,
-        earliest:    str,
-        latest:      str,
+        host: str,
+        org_id: str,
+        index: str,
+        span: str,
+        earliest: str,
+        latest: str,
     ) -> list[dict]:
         """
         Run an mstats oneshot export and return [{time, value}] rows.
         Returns empty list on any Splunk error.
         """
-        vf  = _val_field(index)
+        vf = _val_field(index)
         spl = (
             f"| mstats avg({vf}) as val "
             f"WHERE index={index} "
-            f"metric_name=\"{metric_name}\" host=\"{host}\" "
+            f'metric_name="{metric_name}" host="{host}" '
             f"span={span} "
-            f"| eval ts=strftime(_time, \"%Y-%m-%dT%H:%M:%SZ\") "
+            f'| eval ts=strftime(_time, "%Y-%m-%dT%H:%M:%SZ") '
             f"| table ts, val"
         )
         try:
@@ -86,11 +89,11 @@ class SplunkMetricsClient:
                 f"{self._base}/services/search/jobs/export",
                 auth=self._auth,
                 data={
-                    "search":        spl,
+                    "search": spl,
                     "earliest_time": earliest,
-                    "latest_time":   latest,
-                    "output_mode":   "json",
-                    "count":         "0",
+                    "latest_time": latest,
+                    "output_mode": "json",
+                    "count": "0",
                 },
             )
             resp.raise_for_status()
@@ -111,7 +114,7 @@ class SplunkMetricsClient:
                 continue
             result = obj.get("result", {})
             ts_raw = result.get("ts") or result.get("_time")
-            val    = result.get("val")
+            val = result.get("val")
             if ts_raw is None or val is None:
                 continue
             try:

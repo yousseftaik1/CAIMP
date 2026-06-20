@@ -30,6 +30,7 @@ async def get_conn() -> AsyncGenerator[asyncpg.Connection, None]:
 async def get_tenant_conn(org_id: str) -> AsyncGenerator[asyncpg.Connection, None]:
     """Acquire a connection with RLS org context set for the current transaction."""
     from caimp_auth.rls import set_org_context
+
     async with _pool.acquire() as conn:
         async with conn.transaction():
             await set_org_context(conn, org_id)

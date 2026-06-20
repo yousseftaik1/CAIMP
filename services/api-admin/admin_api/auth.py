@@ -1,4 +1,5 @@
 """FastAPI auth dependencies for the Admin API."""
+
 from __future__ import annotations
 
 from fastapi import Depends, HTTPException, status
@@ -32,5 +33,7 @@ async def get_current_user(
 
 async def require_admin(user: TokenData = Depends(get_current_user)) -> TokenData:
     if user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required"
+        )
     return user

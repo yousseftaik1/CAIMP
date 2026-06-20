@@ -38,7 +38,10 @@ async def fire_notification(
         else:
             log.warning(
                 "ALERT fired | org=%s server=%s severity=%s message=%s",
-                org_id, server_id, severity, message,
+                org_id,
+                server_id,
+                severity,
+                message,
             )
 
 

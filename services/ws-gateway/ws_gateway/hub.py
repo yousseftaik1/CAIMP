@@ -34,7 +34,9 @@ class ConnectionHub:
             self._conns[org_id].discard(ws)
             if not self._conns[org_id]:
                 del self._conns[org_id]
-        _active_connections.labels(org_id=org_id).set(len(self._conns.get(org_id, set())))
+        _active_connections.labels(org_id=org_id).set(
+            len(self._conns.get(org_id, set()))
+        )
 
     async def broadcast(self, org_id: str, payload: dict) -> None:
         """Send JSON payload to every WebSocket in the org. Remove dead connections."""

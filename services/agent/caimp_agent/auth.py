@@ -12,7 +12,6 @@ Enrollment flow:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import time
@@ -32,6 +31,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Key generation
 # ---------------------------------------------------------------------------
+
 
 def generate_keypair(key_path: Path) -> ec.EllipticCurvePrivateKey:
     """Generate ECDSA P-256 keypair and persist private key (chmod 600)."""
@@ -58,6 +58,7 @@ def load_or_generate_key(key_path: Path) -> ec.EllipticCurvePrivateKey:
 # CSR
 # ---------------------------------------------------------------------------
 
+
 def build_csr(
     private_key: ec.EllipticCurvePrivateKey,
     server_name: str,
@@ -65,9 +66,7 @@ def build_csr(
     """Build a PEM-encoded CSR for the agent identity."""
     csr = (
         x509.CertificateSigningRequestBuilder()
-        .subject_name(
-            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, server_name)])
-        )
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, server_name)]))
         .sign(private_key, hashes.SHA256())
     )
     return csr.public_bytes(serialization.Encoding.PEM)
@@ -76,6 +75,7 @@ def build_csr(
 # ---------------------------------------------------------------------------
 # Enrollment
 # ---------------------------------------------------------------------------
+
 
 class EnrollmentManager:
     def __init__(self, cfg: AgentConfig) -> None:
@@ -114,8 +114,8 @@ class EnrollmentManager:
             return False
         pem = self.cfg.cert_path.read_bytes()
         cert = x509.load_pem_x509_certificate(pem)
-        total  = (cert.not_valid_after_utc - cert.not_valid_before_utc).total_seconds()
-        remain = (cert.not_valid_after_utc.timestamp() - time.time())
+        total = (cert.not_valid_after_utc - cert.not_valid_before_utc).total_seconds()
+        remain = cert.not_valid_after_utc.timestamp() - time.time()
         return remain < total * 0.25
 
     def renew_cert(self) -> None:
@@ -139,6 +139,7 @@ class EnrollmentManager:
 # ---------------------------------------------------------------------------
 # JWT manager
 # ---------------------------------------------------------------------------
+
 
 class JWTManager:
     def __init__(self, cfg: AgentConfig) -> None:

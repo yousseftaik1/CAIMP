@@ -23,24 +23,35 @@ def build_prompt(
     The target audience is a startup developer with no DevOps background who
     just wants to know: what broke, why, and what to do about it.
     """
-    history_lines = "\n".join(
-        f"  {r['time']}: {r['value']:.1%}" if r['value'] <= 1.0 else f"  {r['time']}: {r['value']:.1f}%"
-        for r in metric_history[:20]
-    ) or "  No recent history available"
+    history_lines = (
+        "\n".join(
+            f"  {r['time']}: {r['value']:.1%}"
+            if r["value"] <= 1.0
+            else f"  {r['time']}: {r['value']:.1f}%"
+            for r in metric_history[:20]
+        )
+        or "  No recent history available"
+    )
 
-    rag_lines = "\n\n".join(
-        f"[{d['type'].upper()}] {d['title'] or 'Past incident'}:\n{d['content'][:400]}"
-        for d in rag_docs
-    ) or "  No similar incidents in knowledge base"
+    rag_section = (
+        "\n\n".join(
+            f"[{d['type'].upper()}] {d['title'] or 'Past incident'}:\n{d['content'][:400]}"
+            for d in rag_docs
+        )
+        or "  No similar incidents in knowledge base"
+    )
 
-    metric = event.get('metric_name', 'unknown metric')
-    value  = event.get('value', 0)
-    pct    = f"{value * 100:.1f}%" if value <= 1.0 else f"{value:.1f}%"
-    sev    = event.get('severity', 'warning')
+    metric = event.get("metric_name", "unknown metric")
+    value = event.get("value", 0)
+    pct = f"{value * 100:.1f}%" if value <= 1.0 else f"{value:.1f}%"
+    sev = event.get("severity", "warning")
 
-    return f"""Server alert: {sev.upper()} — {metric.replace('system.', '').replace('.', ' ')} at {pct}.
+    return f"""Server alert: {sev.upper()} — {metric.replace("system.", "").replace(".", " ")} at {pct}.
 
 Recent readings: {history_lines[:200]}
+
+Similar past incidents:
+{rag_section[:600]}
 
 Respond ONLY with valid JSON (no markdown, no extra text):
 {{"explanation":"2 sentences explaining what happened in plain language","root_cause":"most likely cause","recommended_action":"one concrete action to take now","confidence":"low"}}"""

@@ -13,7 +13,9 @@ _GENERATE_TIMEOUT = 180.0
 
 
 async def embed(text: str) -> list[float]:
-    async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=_EMBED_TIMEOUT) as client:
+    async with httpx.AsyncClient(
+        base_url=settings.ollama_base_url, timeout=_EMBED_TIMEOUT
+    ) as client:
         resp = await client.post(
             "/api/embeddings",
             json={"model": settings.embed_model, "prompt": text},
@@ -23,7 +25,9 @@ async def embed(text: str) -> list[float]:
 
 
 async def generate(prompt: str) -> str:
-    async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=_GENERATE_TIMEOUT) as client:
+    async with httpx.AsyncClient(
+        base_url=settings.ollama_base_url, timeout=_GENERATE_TIMEOUT
+    ) as client:
         resp = await client.post(
             "/api/generate",
             json={
@@ -40,7 +44,9 @@ async def generate(prompt: str) -> str:
 
 async def is_ready() -> bool:
     try:
-        async with httpx.AsyncClient(base_url=settings.ollama_base_url, timeout=5.0) as client:
+        async with httpx.AsyncClient(
+            base_url=settings.ollama_base_url, timeout=5.0
+        ) as client:
             resp = await client.get("/")
             return resp.status_code == 200
     except Exception:

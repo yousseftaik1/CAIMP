@@ -8,7 +8,16 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .cache import close_redis, init_redis
 from .db import close_pool, init_pool
-from .routers import ai, anomalies, dashboard, forecasts, incidents, metrics, reports, servers
+from .routers import (
+    ai,
+    anomalies,
+    dashboard,
+    forecasts,
+    incidents,
+    metrics,
+    reports,
+    servers,
+)
 
 log = logging.getLogger(__name__)
 

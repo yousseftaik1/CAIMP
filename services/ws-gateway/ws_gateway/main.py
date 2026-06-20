@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 import jwt as pyjwt
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from prometheus_client import make_asgi_app
 
 from nats_client.client import NatsClient

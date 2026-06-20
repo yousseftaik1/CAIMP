@@ -60,12 +60,13 @@ def _handle_signal(*_):
 # Main
 # ---------------------------------------------------------------------------
 
+
 async def run(cfg: AgentConfig) -> None:
     cfg.ensure_data_dir()
 
     enrollment = EnrollmentManager(cfg)
-    jwt_mgr    = JWTManager(cfg)
-    buffer     = SQLiteBuffer(cfg.buffer_path, cfg.buffer_max_mb, cfg.buffer_max_hours)
+    jwt_mgr = JWTManager(cfg)
+    buffer = SQLiteBuffer(cfg.buffer_path, cfg.buffer_max_mb, cfg.buffer_max_hours)
 
     # Check cert renewal
     if enrollment.is_enrolled() and enrollment.cert_needs_renewal():
@@ -79,15 +80,17 @@ async def run(cfg: AgentConfig) -> None:
     exporter = BufferedOTLPExporter.with_mtls(cfg, jwt_mgr, buffer)
 
     # OTLP resource: identifies this agent in all telemetry
-    resource = Resource.create({
-        "service.name":    "caimp-agent",
-        "service.version": "2.0.0",
-        "host.name":       cfg.server_name,
-        "host.id":         socket.gethostname(),
-        # org_id and server_id are stamped here so the Collector can read them
-        "org.id":          os.getenv("CAIMP_ORG_ID", "unknown"),
-        "server.id":       os.getenv("CAIMP_SERVER_ID", "unknown"),
-    })
+    resource = Resource.create(
+        {
+            "service.name": "caimp-agent",
+            "service.version": "2.0.0",
+            "host.name": cfg.server_name,
+            "host.id": socket.gethostname(),
+            # org_id and server_id are stamped here so the Collector can read them
+            "org.id": os.getenv("CAIMP_ORG_ID", "unknown"),
+            "server.id": os.getenv("CAIMP_SERVER_ID", "unknown"),
+        }
+    )
 
     reader = PeriodicExportingMetricReader(
         exporter,
@@ -115,6 +118,7 @@ async def run(cfg: AgentConfig) -> None:
     # Change reporters — track deployments, Docker events, packages, SSH, cron
     try:
         from caimp_agent.change_reporters import start_all_reporters
+
         server_id = os.getenv("CAIMP_SERVER_ID", "")
         jwt_token = jwt_mgr.current_token() if hasattr(jwt_mgr, "current_token") else ""
         if server_id and jwt_token:
@@ -137,7 +141,8 @@ async def run(cfg: AgentConfig) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="CAIMP v2 Server Agent")
     parser.add_argument(
-        "--enroll", metavar="TOKEN",
+        "--enroll",
+        metavar="TOKEN",
         help="Enroll this agent with the given one-time token, then exit",
     )
     args = parser.parse_args()

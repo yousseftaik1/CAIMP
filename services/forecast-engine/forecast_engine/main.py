@@ -27,7 +27,10 @@ async def _wait_ollama(retries: int = 30, delay: float = 10.0) -> None:
             return
         log.info("Waiting for Ollama... attempt %d/%d", i + 1, retries)
         await asyncio.sleep(delay)
-    log.warning("Ollama not ready after %d attempts — forecasts will run without LLM narratives", retries)
+    log.warning(
+        "Ollama not ready after %d attempts — forecasts will run without LLM narratives",
+        retries,
+    )
 
 
 async def main() -> None:

@@ -10,6 +10,7 @@ Both use cosine similarity via pgvector (<=> operator).
 Similarity thresholds: 0.6 for incidents, 0.55 for runbooks (slightly
 lower because runbook titles may not closely match the anomaly signature).
 """
+
 from __future__ import annotations
 
 import logging
@@ -20,12 +21,13 @@ import httpx
 log = logging.getLogger(__name__)
 
 _INCIDENT_SIMILARITY_THRESHOLD = 0.6
-_RUNBOOK_SIMILARITY_THRESHOLD  = 0.55
+_RUNBOOK_SIMILARITY_THRESHOLD = 0.55
 _INCIDENT_LIMIT = 3
-_RUNBOOK_LIMIT  = 2
+_RUNBOOK_LIMIT = 2
 
 
 # ── embedding ─────────────────────────────────────────────────────────────────
+
 
 async def get_embedding(
     text: str,
@@ -50,6 +52,7 @@ def _vec_literal(embedding: list[float]) -> str:
 
 # ── retrieval ─────────────────────────────────────────────────────────────────
 
+
 async def retrieve_rag_context(
     anomaly: dict,
     db: asyncpg.Connection,
@@ -72,22 +75,22 @@ async def retrieve_rag_context(
 
     # ── embed ─────────────────────────────────────────────────────────────────
     try:
-        embedding = await get_embedding(text=signature, http=http,
-                                        ollama_url=ollama_url,
-                                        embed_model=embed_model)
+        embedding = await get_embedding(
+            text=signature, http=http, ollama_url=ollama_url, embed_model=embed_model
+        )
         vec = _vec_literal(embedding)
     except Exception as exc:
         log.warning(f"Embedding failed — skipping RAG: {exc}")
         return {
             "similar_incidents_text": "  (embedding unavailable)",
-            "runbook_text":           "  (embedding unavailable)",
-            "docs_used":              [],
+            "runbook_text": "  (embedding unavailable)",
+            "docs_used": [],
         }
 
     # ── past incidents from rag_documents ────────────────────────────────────
     try:
         incident_rows = await db.fetch(
-            f"""
+            """
             SELECT content, doc_type, source_id,
                    1 - (embedding <=> $1::vector) AS similarity
             FROM rag_documents
@@ -109,7 +112,7 @@ async def retrieve_rag_context(
     # ── runbooks table ────────────────────────────────────────────────────────
     try:
         runbook_rows = await db.fetch(
-            f"""
+            """
             SELECT content, title, anomaly_type,
                    1 - (embedding <=> $1::vector) AS similarity
             FROM runbooks
@@ -128,23 +131,24 @@ async def retrieve_rag_context(
         runbook_rows = []
 
     # ── format for prompt ─────────────────────────────────────────────────────
-    incidents_text = "\n".join(
-        f"  Past incident (similarity={r['similarity']:.2f}): "
-        f"{r['content'][:300]}"
-        for r in incident_rows
-    ) or "  (no similar past incidents found)"
+    incidents_text = (
+        "\n".join(
+            f"  Past incident (similarity={r['similarity']:.2f}): {r['content'][:300]}"
+            for r in incident_rows
+        )
+        or "  (no similar past incidents found)"
+    )
 
-    runbooks_text = "\n".join(
-        f"  Runbook '{r['title']}' (covers: {r['anomaly_type']}): "
-        f"{r['content'][:300]}"
-        for r in runbook_rows
-    ) or "  (no matching runbooks found)"
+    runbooks_text = (
+        "\n".join(
+            f"  Runbook '{r['title']}' (covers: {r['anomaly_type']}): "
+            f"{r['content'][:300]}"
+            for r in runbook_rows
+        )
+        or "  (no matching runbooks found)"
+    )
 
-    docs_used = [
-        str(r["source_id"])
-        for r in incident_rows
-        if r.get("source_id")
-    ]
+    docs_used = [str(r["source_id"]) for r in incident_rows if r.get("source_id")]
 
     log.info(
         f"RAG retrieved | incidents={len(incident_rows)} "
@@ -154,6 +158,6 @@ async def retrieve_rag_context(
 
     return {
         "similar_incidents_text": incidents_text,
-        "runbook_text":           runbooks_text,
-        "docs_used":              docs_used,
+        "runbook_text": runbooks_text,
+        "docs_used": docs_used,
     }

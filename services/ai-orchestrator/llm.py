@@ -9,6 +9,7 @@ Routing logic (evaluated in order):
 Both callers return the raw text from the model (should be the JSON defined
 in OUTPUT_SCHEMA). Validation happens in output_validator.py (Step 15).
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,20 +20,21 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-_OLLAMA_URL   = os.environ.get("OLLAMA_URL",   "http://ollama:11434")
+_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
 _OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b-instruct-q4_K_M")
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-_ANTHROPIC_MODEL   = "claude-sonnet-4-20250514"
+_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 
 
 # ── Ollama ────────────────────────────────────────────────────────────────────
 
+
 async def call_ollama(
-    prompt:     str,
-    http:       httpx.AsyncClient,
+    prompt: str,
+    http: httpx.AsyncClient,
     ollama_url: str = _OLLAMA_URL,
-    model:      str = _OLLAMA_MODEL,
+    model: str = _OLLAMA_MODEL,
 ) -> str:
     """
     POST to Ollama /api/generate with JSON-mode output.
@@ -41,10 +43,10 @@ async def call_ollama(
     resp = await http.post(
         f"{ollama_url}/api/generate",
         json={
-            "model":   model,
-            "prompt":  prompt,
-            "format":  "json",
-            "stream":  False,
+            "model": model,
+            "prompt": prompt,
+            "format": "json",
+            "stream": False,
             "options": {
                 "temperature": 0.2,
                 "num_predict": 600,
@@ -58,11 +60,12 @@ async def call_ollama(
 
 # ── Anthropic ─────────────────────────────────────────────────────────────────
 
+
 async def call_anthropic(
-    prompt:  str,
+    prompt: str,
     api_key: str,
-    http:    httpx.AsyncClient,
-    model:   str = _ANTHROPIC_MODEL,
+    http: httpx.AsyncClient,
+    model: str = _ANTHROPIC_MODEL,
 ) -> str:
     """
     POST to Anthropic Messages API.
@@ -71,14 +74,14 @@ async def call_anthropic(
     resp = await http.post(
         _ANTHROPIC_API_URL,
         headers={
-            "x-api-key":         api_key,
+            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
-            "content-type":      "application/json",
+            "content-type": "application/json",
         },
         json={
-            "model":      model,
+            "model": model,
             "max_tokens": 600,
-            "messages":   [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": prompt}],
         },
         timeout=60.0,
     )
@@ -88,13 +91,14 @@ async def call_anthropic(
 
 # ── Router ────────────────────────────────────────────────────────────────────
 
+
 async def route_and_call(
-    prompt:     str,
-    anomaly:    dict,
-    db:         asyncpg.Connection,
-    http:       httpx.AsyncClient,
+    prompt: str,
+    anomaly: dict,
+    db: asyncpg.Connection,
+    http: httpx.AsyncClient,
     ollama_url: str = _OLLAMA_URL,
-    model:      str = _OLLAMA_MODEL,
+    model: str = _OLLAMA_MODEL,
 ) -> tuple[str, str]:
     """
     Select the right LLM and call it.
@@ -104,19 +108,18 @@ async def route_and_call(
     RAG + context are already assembled so the fallback is cheap.
     """
     severity = anomaly.get("severity", "low")
-    org_id   = anomaly.get("org_id",   "")
+    org_id = anomaly.get("org_id", "")
 
     # ── look up per-org cloud-LLM config ──────────────────────────────────────
-    api_key   = None
+    api_key = None
     use_cloud = False
     try:
         row = await db.fetchrow(
-            "SELECT anthropic_api_key, use_cloud_llm "
-            "FROM org_config WHERE org_id = $1",
+            "SELECT anthropic_api_key, use_cloud_llm FROM org_config WHERE org_id = $1",
             org_id,
         )
         if row:
-            api_key   = row["anthropic_api_key"]
+            api_key = row["anthropic_api_key"]
             use_cloud = bool(row["use_cloud_llm"])
     except Exception as exc:
         log.warning(f"org_config lookup failed (will use Ollama): {exc}")

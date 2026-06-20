@@ -20,6 +20,7 @@ try:
     from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
         ExportLogsServiceRequest as LogsRequest,
     )
+
     PROTO_AVAILABLE = True
 except ImportError:
     PROTO_AVAILABLE = False
@@ -30,22 +31,22 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-SPLUNK_HEC_URL          = os.environ["SPLUNK_HEC_URL"]
-HEC_TOKEN_METRICS       = os.environ["SPLUNK_HEC_TOKEN_METRICS"]
-HEC_TOKEN_LOGS          = os.environ.get("SPLUNK_HEC_TOKEN_LOGS", "")
-SPLUNK_VERIFY_TLS       = os.environ.get("SPLUNK_VERIFY_TLS", "false").lower() == "true"
-REDIS_URL               = os.environ.get("REDIS_URL", "redis://redis:6379")
-HEC_BATCH_SIZE          = 100
+SPLUNK_HEC_URL = os.environ["SPLUNK_HEC_URL"]
+HEC_TOKEN_METRICS = os.environ["SPLUNK_HEC_TOKEN_METRICS"]
+HEC_TOKEN_LOGS = os.environ.get("SPLUNK_HEC_TOKEN_LOGS", "")
+SPLUNK_VERIFY_TLS = os.environ.get("SPLUNK_VERIFY_TLS", "false").lower() == "true"
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+HEC_BATCH_SIZE = 100
 
 redis_client: aioredis.Redis | None = None
-http_client:  httpx.AsyncClient | None = None
+http_client: httpx.AsyncClient | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global redis_client, http_client
     redis_client = await aioredis.from_url(REDIS_URL, decode_responses=True)
-    http_client  = httpx.AsyncClient(verify=SPLUNK_VERIFY_TLS, timeout=10.0)
+    http_client = httpx.AsyncClient(verify=SPLUNK_VERIFY_TLS, timeout=10.0)
     log.info("startup complete")
     yield
     await redis_client.aclose()
@@ -56,6 +57,7 @@ app = FastAPI(title="Splunk HEC Bridge", version="1.0.0", lifespan=lifespan)
 
 
 # ── internal helpers ──────────────────────────────────────────────────────────
+
 
 def _attr_map(attributes) -> dict[str, str]:
     """OTLP repeated KeyValue → plain dict."""
@@ -84,8 +86,8 @@ async def _post_hec(events: list[dict], token: str) -> None:
     """Batch POST events to Splunk HEC (newline-delimited JSON)."""
     for i in range(0, len(events), HEC_BATCH_SIZE):
         batch = events[i : i + HEC_BATCH_SIZE]
-        body  = "\n".join(json.dumps(e) for e in batch)
-        resp  = await http_client.post(
+        body = "\n".join(json.dumps(e) for e in batch)
+        resp = await http_client.post(
             SPLUNK_HEC_URL,
             headers={
                 "Authorization": f"Splunk {token}",
@@ -101,16 +103,20 @@ async def _post_hec(events: list[dict], token: str) -> None:
             raise ValueError(f"HEC non-200: {resp.status_code}")
 
 
-async def _write_redis(org_id: str, server_id: str,
-                       metric_name: str, value: float) -> None:
+async def _write_redis(
+    org_id: str, server_id: str, metric_name: str, value: float
+) -> None:
     """Write latest metric value to Redis for live dashboard (TTL 90s)."""
     try:
-        await redis_client.setex(f"live:{org_id}:{server_id}:{metric_name}", 90, str(value))
+        await redis_client.setex(
+            f"live:{org_id}:{server_id}:{metric_name}", 90, str(value)
+        )
     except Exception as exc:
         log.warning(f"Redis live-write failed (non-fatal): {exc}")
 
 
 # ── OTLP protobuf metric parsing ──────────────────────────────────────────────
+
 
 def _parse_otlp_proto_metrics(raw: bytes) -> list[dict]:
     """
@@ -125,15 +131,15 @@ def _parse_otlp_proto_metrics(raw: bytes) -> list[dict]:
 
     for rm in req.resource_metrics:
         res_attrs = _attr_map(rm.resource.attributes)
-        host         = res_attrs.get("host.name", "unknown")
-        org_id       = res_attrs.get("caimp.org_id", "")
-        server_id    = res_attrs.get("caimp.server_id", "")
-        agent_ver    = res_attrs.get("service.version", "unknown")
+        host = res_attrs.get("host.name", "unknown")
+        org_id = res_attrs.get("caimp.org_id", "")
+        server_id = res_attrs.get("caimp.server_id", "")
+        agent_ver = res_attrs.get("service.version", "unknown")
 
         # Collect all metrics for this resource into one HEC event
         fields: dict[str, Any] = {
-            "org_id":        org_id,
-            "server_id":     server_id,
+            "org_id": org_id,
+            "server_id": server_id,
             "agent_version": agent_ver,
         }
         ts_epoch: float = time.time()
@@ -141,7 +147,7 @@ def _parse_otlp_proto_metrics(raw: bytes) -> list[dict]:
         for sm in rm.scope_metrics:
             for metric in sm.metrics:
                 name = metric.name
-                dps  = []
+                dps = []
                 if metric.HasField("gauge"):
                     dps = list(metric.gauge.data_points)
                 elif metric.HasField("sum"):
@@ -159,18 +165,20 @@ def _parse_otlp_proto_metrics(raw: bytes) -> list[dict]:
         live_writes = {k: v for k, v in fields.items() if k.startswith("__live__")}
         clean_fields = {k: v for k, v in fields.items() if not k.startswith("__live__")}
 
-        hec_events.append({
-            "_live": live_writes,
-            "event": {
-                "time":       ts_epoch,
-                "event":      "metric",
-                "host":       host,
-                "source":     f"caimp-agent:{agent_ver}",
-                "sourcetype": "caimp:metrics",
-                "index":      "caimp_metrics",
-                "fields":     clean_fields,
+        hec_events.append(
+            {
+                "_live": live_writes,
+                "event": {
+                    "time": ts_epoch,
+                    "event": "metric",
+                    "host": host,
+                    "source": f"caimp-agent:{agent_ver}",
+                    "sourcetype": "caimp:metrics",
+                    "index": "caimp_metrics",
+                    "fields": clean_fields,
+                },
             }
-        })
+        )
 
     return hec_events
 
@@ -183,15 +191,15 @@ def _parse_json_metrics(body: dict) -> list[dict]:
       "metrics": [{"name": "...", "value": 87.3, "timestamp_unix_nano": ...}]
     }
     """
-    ra         = body.get("resource_attributes", {})
-    host       = ra.get("host.name", "unknown")
-    org_id     = ra.get("caimp.org_id", "")
-    server_id  = ra.get("caimp.server_id", "")
-    agent_ver  = ra.get("service.version", "unknown")
+    ra = body.get("resource_attributes", {})
+    host = ra.get("host.name", "unknown")
+    org_id = ra.get("caimp.org_id", "")
+    server_id = ra.get("caimp.server_id", "")
+    agent_ver = ra.get("service.version", "unknown")
 
     fields: dict[str, Any] = {
-        "org_id":        org_id,
-        "server_id":     server_id,
+        "org_id": org_id,
+        "server_id": server_id,
         "agent_version": agent_ver,
     }
     live_writes: dict[str, tuple] = {}
@@ -199,27 +207,30 @@ def _parse_json_metrics(body: dict) -> list[dict]:
 
     for m in body.get("metrics", []):
         name = m["name"]
-        val  = float(m["value"])
+        val = float(m["value"])
         if m.get("timestamp_unix_nano"):
             ts_epoch = m["timestamp_unix_nano"] / 1e9
         fields[f"metric_name:{name}"] = val
         live_writes[name] = (org_id, server_id, name, val)
 
-    return [{
-        "_live": live_writes,
-        "event": {
-            "time":       ts_epoch,
-            "event":      "metric",
-            "host":       host,
-            "source":     f"caimp-agent:{agent_ver}",
-            "sourcetype": "caimp:metrics",
-            "index":      "caimp_metrics",
-            "fields":     fields,
+    return [
+        {
+            "_live": live_writes,
+            "event": {
+                "time": ts_epoch,
+                "event": "metric",
+                "host": host,
+                "source": f"caimp-agent:{agent_ver}",
+                "sourcetype": "caimp:metrics",
+                "index": "caimp_metrics",
+                "fields": fields,
+            },
         }
-    }]
+    ]
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health():
@@ -239,10 +250,12 @@ async def ingest_metrics(request: Request):
             parsed = _parse_json_metrics(json.loads(raw))
     except Exception as exc:
         log.error(f"Parse error: {exc}")
-        return JSONResponse({"error": "parse_failed", "detail": str(exc)}, status_code=400)
+        return JSONResponse(
+            {"error": "parse_failed", "detail": str(exc)}, status_code=400
+        )
 
     hec_events = [p["event"] for p in parsed]
-    live_data   = {k: v for p in parsed for k, v in p["_live"].items()}
+    live_data = {k: v for p in parsed for k, v in p["_live"].items()}
 
     try:
         await _post_hec(hec_events, HEC_TOKEN_METRICS)
@@ -271,40 +284,50 @@ async def ingest_logs(request: Request):
             req.ParseFromString(raw)
             for rl in req.resource_logs:
                 res_attrs = _attr_map(rl.resource.attributes)
-                host      = res_attrs.get("host.name", "unknown")
-                org_id    = res_attrs.get("caimp.org_id", "")
+                host = res_attrs.get("host.name", "unknown")
+                org_id = res_attrs.get("caimp.org_id", "")
                 server_id = res_attrs.get("caimp.server_id", "")
                 for sl in rl.scope_logs:
                     for lr in sl.log_records:
-                        ts = lr.time_unix_nano / 1e9 if lr.time_unix_nano else time.time()
-                        hec_events.append({
-                            "time":       ts,
-                            "event":      lr.body.string_value,
-                            "host":       host,
-                            "source":     res_attrs.get("service.name", "caimp-agent"),
-                            "sourcetype": "caimp:logs",
-                            "index":      "caimp_logs",
-                            "fields":     {"org_id": org_id, "server_id": server_id},
-                        })
+                        ts = (
+                            lr.time_unix_nano / 1e9
+                            if lr.time_unix_nano
+                            else time.time()
+                        )
+                        hec_events.append(
+                            {
+                                "time": ts,
+                                "event": lr.body.string_value,
+                                "host": host,
+                                "source": res_attrs.get("service.name", "caimp-agent"),
+                                "sourcetype": "caimp:logs",
+                                "index": "caimp_logs",
+                                "fields": {"org_id": org_id, "server_id": server_id},
+                            }
+                        )
         else:
             body = json.loads(raw)
-            ra        = body.get("resource_attributes", {})
-            host      = ra.get("host.name", "unknown")
-            org_id    = ra.get("caimp.org_id", "")
+            ra = body.get("resource_attributes", {})
+            host = ra.get("host.name", "unknown")
+            org_id = ra.get("caimp.org_id", "")
             server_id = ra.get("caimp.server_id", "")
             for entry in body.get("logs", []):
-                hec_events.append({
-                    "time":       entry.get("timestamp", time.time()),
-                    "event":      entry.get("message", ""),
-                    "host":       host,
-                    "source":     entry.get("source", "/var/log/syslog"),
-                    "sourcetype": "caimp:logs",
-                    "index":      "caimp_logs",
-                    "fields":     {"org_id": org_id, "server_id": server_id},
-                })
+                hec_events.append(
+                    {
+                        "time": entry.get("timestamp", time.time()),
+                        "event": entry.get("message", ""),
+                        "host": host,
+                        "source": entry.get("source", "/var/log/syslog"),
+                        "sourcetype": "caimp:logs",
+                        "index": "caimp_logs",
+                        "fields": {"org_id": org_id, "server_id": server_id},
+                    }
+                )
     except Exception as exc:
         log.error(f"Log parse error: {exc}")
-        return JSONResponse({"error": "parse_failed", "detail": str(exc)}, status_code=400)
+        return JSONResponse(
+            {"error": "parse_failed", "detail": str(exc)}, status_code=400
+        )
 
     if not hec_events:
         return {"message": "ok", "events_sent": 0}

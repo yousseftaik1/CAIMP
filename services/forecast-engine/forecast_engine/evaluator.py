@@ -6,6 +6,7 @@ This is the learning feedback loop: each time we evaluate a forecast we build
 a historical record that the worker uses to inform LLM confidence on future
 predictions for the same server/metric.
 """
+
 from __future__ import annotations
 
 import json
@@ -47,7 +48,7 @@ async def evaluate_past_forecasts(pool: asyncpg.Pool) -> int:
 
 async def _evaluate_one(pool: asyncpg.Pool, row) -> None:
     forecast_start = row["forecasted_at"]
-    horizon        = row["horizon_hours"]
+    horizon = row["horizon_hours"]
 
     actuals = await pool.fetch(
         """
@@ -61,8 +62,11 @@ async def _evaluate_one(pool: asyncpg.Pool, row) -> None:
         GROUP BY 1
         ORDER BY 1 ASC
         """,
-        row["org_id"], row["server_id"], row["metric_name"],
-        forecast_start, str(horizon),
+        row["org_id"],
+        row["server_id"],
+        row["metric_name"],
+        forecast_start,
+        str(horizon),
     )
 
     if not actuals:
@@ -102,10 +106,15 @@ async def _evaluate_one(pool: asyncpg.Pool, row) -> None:
             accuracy_score = $2
         WHERE id = $3
         """,
-        mae, accuracy_score, row["id"],
+        mae,
+        accuracy_score,
+        row["id"],
     )
 
     log.info(
         "Forecast %s evaluated: metric=%s MAE=%.4f accuracy=%.1f%%",
-        row["id"], row["metric_name"], mae, accuracy_score * 100,
+        row["id"],
+        row["metric_name"],
+        mae,
+        accuracy_score * 100,
     )

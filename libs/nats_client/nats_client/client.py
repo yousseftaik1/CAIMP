@@ -45,13 +45,13 @@ class NatsClient:
         user: str | None = None,
         password: str | None = None,
     ) -> AsyncIterator["NatsClient"]:
-        url      = url      or os.environ.get("NATS_URL",      "nats://localhost:4222")
-        user     = user     or os.environ.get("NATS_USER",     "")
+        url = url or os.environ.get("NATS_URL", "nats://localhost:4222")
+        user = user or os.environ.get("NATS_USER", "")
         password = password or os.environ.get("NATS_PASSWORD", "")
 
         kwargs: dict = {"connect_timeout": 10, "max_reconnect_attempts": -1}
         if user and password:
-            kwargs["user"]     = user
+            kwargs["user"] = user
             kwargs["password"] = password
 
         nc = await nats.connect(url, **kwargs)

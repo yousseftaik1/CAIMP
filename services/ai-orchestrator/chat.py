@@ -8,6 +8,7 @@ Intents (evaluated in order):
   runbook_query — "how do I fix / troubleshoot" → RAG runbook lookup
   general       — everything else → plain LLM answer
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,10 +20,18 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-_HOST_PATTERN     = re.compile(r"\b([\w-]+-\d+|[\w-]+\.(local|prod|dev|stg|internal))\b", re.I)
-_UUID_PATTERN     = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
-_ANOMALY_KEYWORDS = re.compile(r"\b(incident|anomaly|alert|explanation|explain|what happened)\b", re.I)
-_RUNBOOK_KEYWORDS = re.compile(r"\b(how|fix|resolve|troubleshoot|diagnose|steps|runbook|remediat)\b", re.I)
+_HOST_PATTERN = re.compile(
+    r"\b([\w-]+-\d+|[\w-]+\.(local|prod|dev|stg|internal))\b", re.I
+)
+_UUID_PATTERN = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I
+)
+_ANOMALY_KEYWORDS = re.compile(
+    r"\b(incident|anomaly|alert|explanation|explain|what happened)\b", re.I
+)
+_RUNBOOK_KEYWORDS = re.compile(
+    r"\b(how|fix|resolve|troubleshoot|diagnose|steps|runbook|remediat)\b", re.I
+)
 
 
 def classify_intent(message: str, host_hint: str | None) -> tuple[str, dict]:
@@ -50,11 +59,11 @@ def classify_intent(message: str, host_hint: str | None) -> tuple[str, dict]:
 
 
 async def gather_chat_context(
-    intent:  str,
+    intent: str,
     entities: dict,
-    org_id:  str,
-    db:      asyncpg.Pool | None,
-    splunk=None,   # kept for signature compatibility, ignored
+    org_id: str,
+    db: asyncpg.Pool | None,
+    splunk=None,  # kept for signature compatibility, ignored
 ) -> str:
     if not db or not org_id:
         return ""
@@ -66,7 +75,8 @@ async def gather_chat_context(
 
             if intent == "host_query":
                 host = entities.get("host", "")
-                rows = await conn.fetch("""
+                rows = await conn.fetch(
+                    """
                     SELECT ae.time, ae.metric_name, ae.severity, ae.value,
                            ax.explanation, ax.recommended_action
                     FROM   anomaly_events ae
@@ -76,7 +86,10 @@ async def gather_chat_context(
                     WHERE  ae.org_id = $1::uuid
                       AND  (s.hostname ILIKE $2 OR s.name ILIKE $2)
                     ORDER  BY ae.time DESC LIMIT 5
-                """, org_id, f"%{host}%")
+                """,
+                    org_id,
+                    f"%{host}%",
+                )
                 if not rows:
                     return f"No recent anomalies found for server matching '{host}'."
                 lines = [f"Recent anomalies on {host}:"]
@@ -92,14 +105,18 @@ async def gather_chat_context(
             elif intent == "anomaly_query":
                 incident_id = entities.get("incident_id")
                 if incident_id:
-                    row = await conn.fetchrow("""
+                    row = await conn.fetchrow(
+                        """
                         SELECT ae.metric_name, ae.severity, ae.value, ae.time,
                                ax.explanation, ax.root_cause, ax.recommended_action
                         FROM   anomaly_events ae
                         LEFT   JOIN ai_explanations ax
                                    ON ax.incident_id = ae.incident_id AND ax.org_id = ae.org_id
                         WHERE  ae.org_id = $1::uuid AND ae.id = $2::uuid
-                    """, org_id, incident_id)
+                    """,
+                        org_id,
+                        incident_id,
+                    )
                     if row and row["explanation"]:
                         return (
                             f"Anomaly {incident_id[:8]}…: {row['metric_name']} "
@@ -109,13 +126,16 @@ async def gather_chat_context(
                             f"Action: {row['recommended_action'] or 'none'}"
                         )
                 # Fall back to recent anomalies
-                rows = await conn.fetch("""
+                rows = await conn.fetch(
+                    """
                     SELECT ae.time, ae.metric_name, ae.severity, s.name AS server
                     FROM   anomaly_events ae
                     JOIN   servers s ON s.id = ae.server_id
                     WHERE  ae.org_id = $1::uuid
                     ORDER  BY ae.time DESC LIMIT 5
-                """, org_id)
+                """,
+                    org_id,
+                )
                 if not rows:
                     return "No anomalies found in the last 24 hours."
                 return "Recent anomalies:\n" + "\n".join(
@@ -124,12 +144,15 @@ async def gather_chat_context(
                 )
 
             elif intent == "runbook_query":
-                rows = await conn.fetch("""
+                rows = await conn.fetch(
+                    """
                     SELECT title, anomaly_type, content
                     FROM   runbooks
                     WHERE  org_id = $1::uuid
                     ORDER  BY updated_at DESC LIMIT 3
-                """, org_id)
+                """,
+                    org_id,
+                )
                 if not rows:
                     return "No runbooks found. Create some in the Runbooks section."
                 return "Relevant runbooks:\n" + "\n\n".join(
@@ -143,12 +166,14 @@ async def gather_chat_context(
 
 
 def build_chat_prompt(
-    message:  str,
-    history:  list[dict],
-    context:  str,
-    intent:   str,
+    message: str,
+    history: list[dict],
+    context: str,
+    intent: str,
 ) -> str:
-    system = "You are CAIMP's AI assistant for server monitoring. Be concise and direct."
+    system = (
+        "You are CAIMP's AI assistant for server monitoring. Be concise and direct."
+    )
     if context:
         system += f"\nContext:\n{context[:600]}"
 
@@ -161,19 +186,19 @@ def build_chat_prompt(
 
 
 async def stream_ollama(
-    prompt:     str,
-    http:       httpx.AsyncClient,
+    prompt: str,
+    http: httpx.AsyncClient,
     ollama_url: str,
-    model:      str,
+    model: str,
 ) -> AsyncGenerator[str, None]:
     try:
         async with http.stream(
             "POST",
             f"{ollama_url}/api/generate",
             json={
-                "model":   model,
-                "prompt":  prompt,
-                "stream":  True,
+                "model": model,
+                "prompt": prompt,
+                "stream": True,
                 "options": {"num_ctx": 512, "num_predict": 200, "temperature": 0.3},
             },
             timeout=None,
@@ -183,6 +208,7 @@ async def stream_ollama(
                 if not line:
                     continue
                 import json as _json
+
                 try:
                     data = _json.loads(line)
                     if token := data.get("response"):

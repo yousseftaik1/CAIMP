@@ -28,10 +28,12 @@ class CAManager:
     def generate_ca(self) -> tuple[str, bytes]:
         """Return (cert_pem, encrypted_key_bytes) for a new self-signed root CA."""
         key = ec.generate_private_key(ec.SECP256R1())
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, "CAIMP Root CA"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "CAIMP Platform"),
-        ])
+        subject = x509.Name(
+            [
+                x509.NameAttribute(NameOID.COMMON_NAME, "CAIMP Root CA"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "CAIMP Platform"),
+            ]
+        )
         now = datetime.now(tz=timezone.utc)
         cert = (
             x509.CertificateBuilder()
@@ -41,13 +43,20 @@ class CAManager:
             .serial_number(x509.random_serial_number())
             .not_valid_before(now)
             .not_valid_after(now + timedelta(days=3650))
-            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(
+                x509.BasicConstraints(ca=True, path_length=None), critical=True
+            )
             .add_extension(
                 x509.KeyUsage(
-                    key_cert_sign=True, crl_sign=True,
-                    digital_signature=False, content_commitment=False,
-                    key_encipherment=False, data_encipherment=False,
-                    key_agreement=False, encipher_only=False, decipher_only=False,
+                    key_cert_sign=True,
+                    crl_sign=True,
+                    digital_signature=False,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    encipher_only=False,
+                    decipher_only=False,
                 ),
                 critical=True,
             )
@@ -84,21 +93,30 @@ class CAManager:
             .serial_number(x509.random_serial_number())
             .not_valid_before(now)
             .not_valid_after(now + timedelta(days=validity_days))
-            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .add_extension(
-                x509.SubjectAlternativeName([
-                    x509.UniformResourceIdentifier(
-                        f"spiffe://caimp/org/{org_id}/server/{server_id}"
-                    ),
-                ]),
+                x509.BasicConstraints(ca=False, path_length=None), critical=True
+            )
+            .add_extension(
+                x509.SubjectAlternativeName(
+                    [
+                        x509.UniformResourceIdentifier(
+                            f"spiffe://caimp/org/{org_id}/server/{server_id}"
+                        ),
+                    ]
+                ),
                 critical=False,
             )
             .add_extension(
                 x509.KeyUsage(
-                    digital_signature=True, key_agreement=True,
-                    content_commitment=False, key_encipherment=False,
-                    data_encipherment=False, key_cert_sign=False,
-                    crl_sign=False, encipher_only=False, decipher_only=False,
+                    digital_signature=True,
+                    key_agreement=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
                 ),
                 critical=True,
             )
@@ -142,7 +160,7 @@ class CAManager:
         prefix = "spiffe://caimp/org/"
         if not uri.startswith(prefix):
             return None
-        parts = uri[len(prefix):].split("/server/")
+        parts = uri[len(prefix) :].split("/server/")
         if len(parts) != 2 or not parts[0] or not parts[1]:
             return None
         return parts[0], parts[1]
@@ -161,6 +179,6 @@ class CAManager:
         return nonce + self._aesgcm.encrypt(nonce, pem, None)
 
     def _decrypt_key(self, data: bytes) -> ec.EllipticCurvePrivateKey:
-        nonce, ct = data[:self._NONCE_LEN], data[self._NONCE_LEN:]
+        nonce, ct = data[: self._NONCE_LEN], data[self._NONCE_LEN :]
         pem = self._aesgcm.decrypt(nonce, ct, None)
         return serialization.load_pem_private_key(pem, password=None)

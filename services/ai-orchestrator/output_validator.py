@@ -6,6 +6,7 @@ occasionally wrap the JSON in markdown fences, add extra keys, or use
 wrong enum values. This module handles all of that and returns a clean dict,
 or raises ValueError when the response is unrecoverable.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,11 +15,15 @@ import re
 
 log = logging.getLogger(__name__)
 
-_VALID_SEVERITY   = {"critical", "high", "medium", "low"}
+_VALID_SEVERITY = {"critical", "high", "medium", "low"}
 _VALID_CONFIDENCE = {"high", "medium", "low"}
-_REQUIRED_KEYS    = {
-    "severity", "explanation", "root_cause",
-    "recommended_action", "evidence_spl_queries", "confidence",
+_REQUIRED_KEYS = {
+    "severity",
+    "explanation",
+    "root_cause",
+    "recommended_action",
+    "evidence_spl_queries",
+    "confidence",
 }
 
 
@@ -48,9 +53,7 @@ def validate_and_parse(raw: str) -> dict:
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        raise ValueError(
-            f"LLM returned non-JSON: {exc} | raw={raw[:300]!r}"
-        ) from exc
+        raise ValueError(f"LLM returned non-JSON: {exc} | raw={raw[:300]!r}") from exc
 
     if not isinstance(data, dict):
         raise ValueError(f"LLM returned non-object JSON type={type(data).__name__}")

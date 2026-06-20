@@ -6,6 +6,7 @@ max(individual query times), typically 2–5 seconds.
 Query selection uses the tier auto-select logic so dashboards and context
 queries always hit the fastest available index for the requested time range.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,6 +18,7 @@ log = logging.getLogger(__name__)
 
 
 # ── index / span auto-selection ───────────────────────────────────────────────
+
 
 def select_index_and_span(hours: float) -> tuple[str, str]:
     """
@@ -42,14 +44,15 @@ def _val_field(index: str) -> str:
 
 # ── context queries ───────────────────────────────────────────────────────────
 
+
 def _build_queries(anomaly: dict) -> dict[str, tuple[str, str, str]]:
     """
     Returns {name: (spl, earliest, latest)} for each context query.
     Parameterised on the anomaly dict so values are safely interpolated.
     """
-    host    = anomaly["host"]
-    metric  = anomaly["metric_name"]
-    org_id  = anomaly["org_id"]
+    host = anomaly["host"]
+    metric = anomaly["metric_name"]
+    org_id = anomaly["org_id"]
 
     # Short-trend: raw index, 1-minute buckets, last 1 hour
     short_index, short_span = select_index_and_span(1)
@@ -57,7 +60,7 @@ def _build_queries(anomaly: dict) -> dict[str, tuple[str, str, str]]:
 
     # Medium-trend: 5-minute summary, last 24 hours
     med_index, med_span = select_index_and_span(24)
-    vf_med = _val_field(med_index)
+    _val_field(med_index)
 
     return {
         "metric_trend": (
@@ -65,9 +68,10 @@ def _build_queries(anomaly: dict) -> dict[str, tuple[str, str, str]]:
             f"  WHERE index={short_index} "
             f"  metric_name={metric} host={host} org_id={org_id} "
             f"  span={short_span} "
-            f"| eval _time=strftime(_time, \"%H:%M\") "
+            f'| eval _time=strftime(_time, "%H:%M") '
             f"| table _time, val",
-            "-1h", "now",
+            "-1h",
+            "now",
         ),
         "correlated_metrics": (
             f"| mstats avg({vf}) as val "
@@ -78,44 +82,50 @@ def _build_queries(anomaly: dict) -> dict[str, tuple[str, str, str]]:
             f"  host={host} span={short_span} "
             f"| timechart span={short_span} avg(val) by metric_name "
             f"| head 30",
-            "-30m", "now",
+            "-30m",
+            "now",
         ),
         "error_logs": (
-            f'search index=caimp_logs host={host} '
+            f"search index=caimp_logs host={host} "
             f'(log_level=ERROR OR log_level=CRITICAL OR "ERROR" OR "Exception") '
-            f'| table _time, log_level, message '
-            f'| head 30',
-            "-1h", "now",
+            f"| table _time, log_level, message "
+            f"| head 30",
+            "-1h",
+            "now",
         ),
         "past_anomalies": (
             f"search index=caimp_anomalies host={host} "
             f"| table _time, anomaly_type, severity, metric_name "
             f"| head 10",
-            "-7d", "now",
+            "-7d",
+            "now",
         ),
         "ai_history": (
             f"search index=caimp_ai host={host} "
             f"| table _time, anomaly_type, root_cause, confidence "
             f"| head 5",
-            "-30d", "now",
+            "-30d",
+            "now",
         ),
     }
 
 
 # ── result formatting ─────────────────────────────────────────────────────────
 
+
 def _rows_to_text(rows: list[dict], max_rows: int = 20) -> str:
     """Format a list of Splunk result dicts as a plain-text table for the LLM."""
     if not rows:
         return "  (no data)"
     headers = list(rows[0].keys())
-    lines   = ["  " + " | ".join(headers)]
+    lines = ["  " + " | ".join(headers)]
     for row in rows[:max_rows]:
         lines.append("  " + " | ".join(str(row.get(h, "")) for h in headers))
     return "\n".join(lines)
 
 
 # ── main entry point ──────────────────────────────────────────────────────────
+
 
 async def build_context(anomaly: dict, splunk: SplunkClient | None) -> dict:
     """
@@ -124,20 +134,21 @@ async def build_context(anomaly: dict, splunk: SplunkClient | None) -> dict:
     If splunk is None (not configured), returns empty strings for all sections.
     """
     empty = {
-        "metric_trend_text":       "  (Splunk not configured)",
+        "metric_trend_text": "  (Splunk not configured)",
         "correlated_metrics_text": "  (Splunk not configured)",
-        "error_logs_text":         "  (Splunk not configured)",
-        "past_anomalies_text":     "  (Splunk not configured)",
-        "ai_history_text":         "  (Splunk not configured)",
-        "context_queries":         [],
+        "error_logs_text": "  (Splunk not configured)",
+        "past_anomalies_text": "  (Splunk not configured)",
+        "ai_history_text": "  (Splunk not configured)",
+        "context_queries": [],
     }
     if splunk is None:
         return empty
 
     queries = _build_queries(anomaly)
 
-    async def safe_query(name: str, spl: str,
-                         earliest: str, latest: str) -> tuple[str, list[dict]]:
+    async def safe_query(
+        name: str, spl: str, earliest: str, latest: str
+    ) -> tuple[str, list[dict]]:
         try:
             rows = await splunk.run_search_oneshot(
                 spl, earliest=earliest, latest=latest
@@ -148,16 +159,18 @@ async def build_context(anomaly: dict, splunk: SplunkClient | None) -> dict:
             return name, []
 
     results = await asyncio.gather(
-        *[safe_query(name, spl, earliest, latest)
-          for name, (spl, earliest, latest) in queries.items()]
+        *[
+            safe_query(name, spl, earliest, latest)
+            for name, (spl, earliest, latest) in queries.items()
+        ]
     )
     result_map = dict(results)
 
     return {
-        "metric_trend_text":       _rows_to_text(result_map["metric_trend"]),
+        "metric_trend_text": _rows_to_text(result_map["metric_trend"]),
         "correlated_metrics_text": _rows_to_text(result_map["correlated_metrics"]),
-        "error_logs_text":         _rows_to_text(result_map["error_logs"]),
-        "past_anomalies_text":     _rows_to_text(result_map["past_anomalies"]),
-        "ai_history_text":         _rows_to_text(result_map["ai_history"]),
-        "context_queries":         list(queries.keys()),
+        "error_logs_text": _rows_to_text(result_map["error_logs"]),
+        "past_anomalies_text": _rows_to_text(result_map["past_anomalies"]),
+        "ai_history_text": _rows_to_text(result_map["ai_history"]),
+        "context_queries": list(queries.keys()),
     }

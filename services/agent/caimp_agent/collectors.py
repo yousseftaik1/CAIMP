@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 # CPU
 # ---------------------------------------------------------------------------
 
+
 def register_cpu_metrics(meter: Meter) -> None:
     # Trigger first sample so subsequent calls return non-zero values
     psutil.cpu_percent(percpu=True)
@@ -38,8 +39,8 @@ def register_cpu_metrics(meter: Meter) -> None:
     def _load_average(options: CallbackOptions) -> Iterable[Observation]:
         try:
             l1, l5, l15 = psutil.getloadavg()
-            yield Observation(l1,  {"period": "1m"})
-            yield Observation(l5,  {"period": "5m"})
+            yield Observation(l1, {"period": "1m"})
+            yield Observation(l5, {"period": "5m"})
             yield Observation(l15, {"period": "15m"})
         except (AttributeError, OSError):
             pass  # Windows does not support load average
@@ -68,13 +69,16 @@ def register_cpu_metrics(meter: Meter) -> None:
 # Memory
 # ---------------------------------------------------------------------------
 
+
 def register_memory_metrics(meter: Meter) -> None:
     def _mem_usage(options: CallbackOptions) -> Iterable[Observation]:
         mem = psutil.virtual_memory()
-        yield Observation(mem.total,     {"state": "total"})
-        yield Observation(mem.used,      {"state": "used"})
+        yield Observation(mem.total, {"state": "total"})
+        yield Observation(mem.used, {"state": "used"})
         yield Observation(mem.available, {"state": "available"})
-        yield Observation(mem.cached if hasattr(mem, "cached") else 0, {"state": "cached"})
+        yield Observation(
+            mem.cached if hasattr(mem, "cached") else 0, {"state": "cached"}
+        )
 
     def _mem_utilization(options: CallbackOptions) -> Iterable[Observation]:
         yield Observation(psutil.virtual_memory().percent / 100.0)
@@ -82,8 +86,8 @@ def register_memory_metrics(meter: Meter) -> None:
     def _swap_usage(options: CallbackOptions) -> Iterable[Observation]:
         swap = psutil.swap_memory()
         yield Observation(swap.total, {"state": "total"})
-        yield Observation(swap.used,  {"state": "used"})
-        yield Observation(swap.free,  {"state": "free"})
+        yield Observation(swap.used, {"state": "used"})
+        yield Observation(swap.free, {"state": "free"})
 
     meter.create_observable_gauge(
         "system.memory.usage",
@@ -109,6 +113,7 @@ def register_memory_metrics(meter: Meter) -> None:
 # Disk
 # ---------------------------------------------------------------------------
 
+
 def register_disk_metrics(meter: Meter) -> None:
     _SKIP_FS = frozenset(("tmpfs", "devtmpfs", "devfs", "squashfs", "overlay"))
 
@@ -122,8 +127,8 @@ def register_disk_metrics(meter: Meter) -> None:
                 continue
             attrs = {"mountpoint": part.mountpoint, "device": part.device}
             yield Observation(u.total, {**attrs, "state": "total"})
-            yield Observation(u.used,  {**attrs, "state": "used"})
-            yield Observation(u.free,  {**attrs, "state": "free"})
+            yield Observation(u.used, {**attrs, "state": "used"})
+            yield Observation(u.free, {**attrs, "state": "free"})
 
     def _disk_utilization(options: CallbackOptions) -> Iterable[Observation]:
         for part in psutil.disk_partitions(all=False):
@@ -142,7 +147,7 @@ def register_disk_metrics(meter: Meter) -> None:
             return
         for disk, c in (counters or {}).items():
             attrs = {"device": disk}
-            yield Observation(c.read_bytes,  {**attrs, "direction": "read"})
+            yield Observation(c.read_bytes, {**attrs, "direction": "read"})
             yield Observation(c.write_bytes, {**attrs, "direction": "write"})
 
     meter.create_observable_gauge(
@@ -169,6 +174,7 @@ def register_disk_metrics(meter: Meter) -> None:
 # Network
 # ---------------------------------------------------------------------------
 
+
 def register_network_metrics(meter: Meter) -> None:
     _SKIP_IFACES = frozenset(("lo", "loopback"))
 
@@ -181,14 +187,26 @@ def register_network_metrics(meter: Meter) -> None:
             if iface.lower() in _SKIP_IFACES:
                 continue
             attrs = {"interface": iface}
-            yield Observation(c.bytes_sent,    {**attrs, "direction": "transmit"})
-            yield Observation(c.bytes_recv,    {**attrs, "direction": "receive"})
-            yield Observation(c.packets_sent,  {**attrs, "direction": "transmit", "type": "packets"})
-            yield Observation(c.packets_recv,  {**attrs, "direction": "receive",  "type": "packets"})
-            yield Observation(c.errout,        {**attrs, "direction": "transmit", "type": "errors"})
-            yield Observation(c.errin,         {**attrs, "direction": "receive",  "type": "errors"})
-            yield Observation(c.dropout,       {**attrs, "direction": "transmit", "type": "dropped"})
-            yield Observation(c.dropin,        {**attrs, "direction": "receive",  "type": "dropped"})
+            yield Observation(c.bytes_sent, {**attrs, "direction": "transmit"})
+            yield Observation(c.bytes_recv, {**attrs, "direction": "receive"})
+            yield Observation(
+                c.packets_sent, {**attrs, "direction": "transmit", "type": "packets"}
+            )
+            yield Observation(
+                c.packets_recv, {**attrs, "direction": "receive", "type": "packets"}
+            )
+            yield Observation(
+                c.errout, {**attrs, "direction": "transmit", "type": "errors"}
+            )
+            yield Observation(
+                c.errin, {**attrs, "direction": "receive", "type": "errors"}
+            )
+            yield Observation(
+                c.dropout, {**attrs, "direction": "transmit", "type": "dropped"}
+            )
+            yield Observation(
+                c.dropin, {**attrs, "direction": "receive", "type": "dropped"}
+            )
 
     meter.create_observable_counter(
         "system.network.io",
@@ -201,6 +219,7 @@ def register_network_metrics(meter: Meter) -> None:
 # ---------------------------------------------------------------------------
 # System / process
 # ---------------------------------------------------------------------------
+
 
 def register_system_metrics(meter: Meter) -> None:
     def _open_fds(options: CallbackOptions) -> Iterable[Observation]:
@@ -238,6 +257,7 @@ def register_system_metrics(meter: Meter) -> None:
 # ---------------------------------------------------------------------------
 # Register all
 # ---------------------------------------------------------------------------
+
 
 def register_all(meter: Meter) -> None:
     register_cpu_metrics(meter)

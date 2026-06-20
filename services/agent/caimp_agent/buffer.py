@@ -32,10 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_captured ON metric_batches (captured_at);
 
 class SQLiteBuffer:
     def __init__(self, path: Path, max_mb: int = 50, max_hours: int = 24) -> None:
-        self._path      = path
+        self._path = path
         self._max_bytes = max_mb * 1024 * 1024
-        self._max_age   = max_hours * 3600
-        self._conn      = sqlite3.connect(str(path), check_same_thread=False)
+        self._max_age = max_hours * 3600
+        self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_DDL)
         self._conn.commit()
@@ -46,9 +46,9 @@ class SQLiteBuffer:
 
     def write(self, payload: list[dict]) -> None:
         """Persist a list of metric records to the buffer."""
-        blob  = json.dumps(payload)
-        size  = len(blob.encode())
-        now   = time.time()
+        blob = json.dumps(payload)
+        size = len(blob.encode())
+        now = time.time()
 
         self._conn.execute(
             "INSERT INTO metric_batches (captured_at, size_bytes, payload) VALUES (?,?,?)",
@@ -72,7 +72,7 @@ class SQLiteBuffer:
             try:
                 yield row_id, json.loads(blob)
             except json.JSONDecodeError:
-                self.mark_replayed(row_id)   # discard corrupt record
+                self.mark_replayed(row_id)  # discard corrupt record
 
     def mark_replayed(self, batch_id: int) -> None:
         self._conn.execute(

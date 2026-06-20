@@ -10,11 +10,11 @@ from pydantic import BaseModel, Field
 
 
 class Streams:
-    METRICS   = "METRICS"
+    METRICS = "METRICS"
     ANOMALIES = "ANOMALIES"
-    AI_OUT    = "AI_OUT"
-    CHAT      = "CHAT"
-    AUDIT     = "AUDIT"
+    AI_OUT = "AI_OUT"
+    CHAT = "CHAT"
+    AUDIT = "AUDIT"
 
 
 class Subjects:
@@ -55,67 +55,68 @@ class Subjects:
 # Message payloads
 # ---------------------------------------------------------------------------
 
+
 class MetricBatch(BaseModel):
-    org_id:     str
-    server_id:  str
-    timestamp:  datetime
-    metrics:    list[dict[str, Any]]
+    org_id: str
+    server_id: str
+    timestamp: datetime
+    metrics: list[dict[str, Any]]
 
 
 class AnomalyEvent(BaseModel):
-    incident_id:    str
-    org_id:         str
-    server_id:      str
-    metric_name:    str
-    value:          float
-    threshold:      float | None = None
-    detector:       str  # static | rate_of_change | zscore
-    severity:       str  # warning | critical
-    timestamp:      datetime = Field(default_factory=datetime.utcnow)
-    labels:         dict[str, str] = {}
+    incident_id: str
+    org_id: str
+    server_id: str
+    metric_name: str
+    value: float
+    threshold: float | None = None
+    detector: str  # static | rate_of_change | zscore
+    severity: str  # warning | critical
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    labels: dict[str, str] = {}
 
 
 class ExplanationReady(BaseModel):
-    incident_id:        str
-    org_id:             str
-    server_id:          str
-    severity:           str
-    explanation:        str
-    root_cause:         str | None = None
+    incident_id: str
+    org_id: str
+    server_id: str
+    severity: str
+    explanation: str
+    root_cause: str | None = None
     recommended_action: str | None = None
-    confidence:         str  # low | medium | high
-    model:              str
-    cached:             bool = False
-    created_at:         datetime = Field(default_factory=datetime.utcnow)
+    confidence: str  # low | medium | high
+    model: str
+    cached: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ChatRequest(BaseModel):
     session_id: str
-    org_id:     str
-    user_id:    str
-    message:    str
-    history:    list[dict[str, str]] = []
+    org_id: str
+    user_id: str
+    message: str
+    history: list[dict[str, str]] = []
 
 
 class AuditEvent(BaseModel):
-    org_id:      str | None = None
-    actor_id:    str | None = None
-    action:      str
+    org_id: str | None = None
+    actor_id: str | None = None
+    action: str
     target_type: str | None = None
-    target_id:   str | None = None
-    details:     dict[str, Any] = {}
-    ip_address:  str | None = None
-    timestamp:   datetime = Field(default_factory=datetime.utcnow)
+    target_id: str | None = None
+    details: dict[str, Any] = {}
+    ip_address: str | None = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ForecastCritical(BaseModel):
-    forecast_id:         str
-    org_id:              str
-    server_id:           str
-    metric_name:         str
-    time_to_critical:    float        # hours until threshold breach
-    current_trend_slope: float        # units per hour
-    critical_threshold:  float
-    llm_narrative:       str | None = None
-    llm_confidence:      str | None = None  # low | medium | high
-    forecasted_at:       datetime = Field(default_factory=datetime.utcnow)
+    forecast_id: str
+    org_id: str
+    server_id: str
+    metric_name: str
+    time_to_critical: float  # hours until threshold breach
+    current_trend_slope: float  # units per hour
+    critical_threshold: float
+    llm_narrative: str | None = None
+    llm_confidence: str | None = None  # low | medium | high
+    forecasted_at: datetime = Field(default_factory=datetime.utcnow)

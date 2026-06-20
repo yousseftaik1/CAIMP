@@ -8,6 +8,7 @@ Receives change events from:
 
 Writes to change_events (TimescaleDB) and publishes change.detected.{org_id} to NATS.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -22,7 +23,7 @@ from typing import Any
 import asyncpg
 import nats
 import uvicorn
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -33,16 +34,18 @@ logging.basicConfig(
 )
 log = logging.getLogger("change-tracker")
 
-DATABASE_URL  = os.getenv("DATABASE_URL", "")
-NATS_URL      = os.getenv("NATS_URL", "nats://nats:4222")
-NATS_USER     = os.getenv("NATS_USER", "caimp")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+NATS_URL = os.getenv("NATS_URL", "nats://nats:4222")
+NATS_USER = os.getenv("NATS_USER", "caimp")
 NATS_PASSWORD = os.getenv("NATS_PASSWORD", "")
-JWT_SECRET    = os.getenv("JWT_SECRET", "")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
 GH_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
-PORT          = int(os.getenv("PORT", "8011"))
+PORT = int(os.getenv("PORT", "8011"))
 
 app = FastAPI(title="CAIMP Change Tracker", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
 
 _pool: asyncpg.Pool | None = None
 _nc: Any = None
@@ -50,6 +53,7 @@ _js: Any = None
 
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
+
 
 @app.on_event("startup")
 async def startup():
@@ -69,16 +73,20 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    if _pool:  await _pool.close()
-    if _nc and not _nc.is_closed:  await _nc.drain()
+    if _pool:
+        await _pool.close()
+    if _nc and not _nc.is_closed:
+        await _nc.drain()
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
+
 
 def _org_id_from_token(token: str) -> str | None:
     """Extract org_id from JWT without full validation (change-tracker is internal)."""
     try:
         from jose import jwt as jose_jwt
+
         payload = jose_jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         return payload.get("org_id")
     except Exception:
@@ -92,6 +100,7 @@ def _bearer(authorization: str | None) -> str:
 
 
 # ── Core write ────────────────────────────────────────────────────────────────
+
 
 async def _save_change(
     org_id: str,
@@ -115,48 +124,65 @@ async def _save_change(
             VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
             """,
-            org_id, server_id, occurred_at, change_type, source,
-            actor, description, json.dumps(payload), git_sha, image_sha,
+            org_id,
+            server_id,
+            occurred_at,
+            change_type,
+            source,
+            actor,
+            description,
+            json.dumps(payload),
+            git_sha,
+            image_sha,
         )
     change_id = str(row["id"])
     if _js:
         try:
-            msg = json.dumps({
-                "id":          change_id,
-                "org_id":      org_id,
-                "server_id":   server_id,
-                "occurred_at": occurred_at.isoformat(),
-                "change_type": change_type,
-                "source":      source,
-                "description": description,
-            }).encode()
+            msg = json.dumps(
+                {
+                    "id": change_id,
+                    "org_id": org_id,
+                    "server_id": server_id,
+                    "occurred_at": occurred_at.isoformat(),
+                    "change_type": change_type,
+                    "source": source,
+                    "description": description,
+                }
+            ).encode()
             await _js.publish(f"change.detected.{org_id}", msg)
         except Exception as exc:
             log.warning("NATS publish failed: %s", exc)
-    log.info("change_event[%s] %s via %s on server=%s", change_id, change_type, source, server_id)
+    log.info(
+        "change_event[%s] %s via %s on server=%s",
+        change_id,
+        change_type,
+        source,
+        server_id,
+    )
     return change_id
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
 
+
 class GenericChangeEvent(BaseModel):
-    server_id:   str | None = None
+    server_id: str | None = None
     change_type: str
-    source:      str = "agent"
-    actor:       str | None = None
+    source: str = "agent"
+    actor: str | None = None
     description: str | None = None
-    payload:     dict = {}
-    git_sha:     str | None = None
-    image_sha:   str | None = None
+    payload: dict = {}
+    git_sha: str | None = None
+    image_sha: str | None = None
     occurred_at: datetime | None = None
 
 
 class DockerEvent(BaseModel):
-    server_id:  str | None = None
-    event_type: str          # start | stop | restart | pull | die
-    image:      str | None = None
-    container:  str | None = None
-    image_sha:  str | None = None
+    server_id: str | None = None
+    event_type: str  # start | stop | restart | pull | die
+    image: str | None = None
+    container: str | None = None
+    image_sha: str | None = None
     occurred_at: datetime | None = None
 
 
@@ -176,7 +202,7 @@ async def ingest_generic(
     authorization: str | None = Header(default=None),
 ):
     """Generic change event from the monitoring agent."""
-    token  = _bearer(authorization)
+    token = _bearer(authorization)
     org_id = _org_id_from_token(token)
     if not org_id:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -202,17 +228,17 @@ async def ingest_docker(
     authorization: str | None = Header(default=None),
 ):
     """Docker daemon event from the monitoring agent's docker-events collector."""
-    token  = _bearer(authorization)
+    token = _bearer(authorization)
     org_id = _org_id_from_token(token)
     if not org_id:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     type_map = {
-        "pull":    "docker_pull",
-        "start":   "restart",
+        "pull": "docker_pull",
+        "start": "restart",
         "restart": "restart",
-        "stop":    "restart",
-        "die":     "restart",
+        "stop": "restart",
+        "die": "restart",
     }
     change_type = type_map.get(evt.event_type, "restart")
     desc = f"Docker {evt.event_type}: {evt.container or evt.image or 'unknown'}"
@@ -224,7 +250,11 @@ async def ingest_docker(
         source="docker_events",
         actor="docker",
         description=desc,
-        payload={"event_type": evt.event_type, "image": evt.image, "container": evt.container},
+        payload={
+            "event_type": evt.event_type,
+            "image": evt.image,
+            "container": evt.container,
+        },
         image_sha=evt.image_sha,
         occurred_at=evt.occurred_at,
     )
@@ -242,9 +272,10 @@ async def github_webhook(
 
     # Verify signature if secret is configured
     if GH_WEBHOOK_SECRET:
-        expected = "sha256=" + hmac.new(
-            GH_WEBHOOK_SECRET.encode(), body, hashlib.sha256
-        ).hexdigest()
+        expected = (
+            "sha256="
+            + hmac.new(GH_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+        )
         if not hmac.compare_digest(expected, x_hub_signature_256 or ""):
             raise HTTPException(status_code=401, detail="Invalid GitHub signature")
 
@@ -260,22 +291,24 @@ async def github_webhook(
         return {"status": "skipped", "reason": "org_id query param required"}
 
     event = x_github_event or "push"
-    repo  = payload.get("repository", {}).get("full_name", "unknown")
-    sha   = payload.get("after") or payload.get("head_commit", {}).get("id")
-    actor = payload.get("pusher", {}).get("name") or payload.get("sender", {}).get("login")
+    repo = payload.get("repository", {}).get("full_name", "unknown")
+    sha = payload.get("after") or payload.get("head_commit", {}).get("id")
+    actor = payload.get("pusher", {}).get("name") or payload.get("sender", {}).get(
+        "login"
+    )
 
     if event == "push":
         branch = payload.get("ref", "").replace("refs/heads/", "")
-        desc   = f"Git push to {repo}/{branch} by {actor}"
+        desc = f"Git push to {repo}/{branch} by {actor}"
         change_type = "deployment"
     elif event == "deployment":
-        env    = payload.get("deployment", {}).get("environment", "unknown")
-        desc   = f"GitHub deployment to {env} on {repo} by {actor}"
+        env = payload.get("deployment", {}).get("environment", "unknown")
+        desc = f"GitHub deployment to {env} on {repo} by {actor}"
         change_type = "deployment"
     elif event == "workflow_run":
         status = payload.get("workflow_run", {}).get("conclusion", "unknown")
-        name   = payload.get("workflow_run", {}).get("name", "workflow")
-        desc   = f"GitHub Actions {name} {status} on {repo}"
+        name = payload.get("workflow_run", {}).get("name", "workflow")
+        desc = f"GitHub Actions {name} {status} on {repo}"
         change_type = "deployment"
     else:
         return {"status": "skipped", "event": event}
@@ -311,28 +344,33 @@ async def gitlab_webhook(
         return {"status": "skipped", "reason": "org_id query param required"}
 
     event = x_gitlab_event or ""
-    sha   = payload.get("checkout_sha") or payload.get("commit", {}).get("id")
+    sha = payload.get("checkout_sha") or payload.get("commit", {}).get("id")
     actor = payload.get("user_username") or payload.get("user_name")
 
     if "Push Hook" in event:
         branch = payload.get("ref", "").replace("refs/heads/", "")
-        desc   = f"GitLab push to {payload.get('project', {}).get('name','?')}/{branch}"
+        desc = f"GitLab push to {payload.get('project', {}).get('name', '?')}/{branch}"
         change_type = "deployment"
     elif "Pipeline Hook" in event:
         status = payload.get("object_attributes", {}).get("status", "unknown")
-        desc   = f"GitLab pipeline {status}"
+        desc = f"GitLab pipeline {status}"
         change_type = "deployment"
     elif "Deployment Hook" in event:
-        env    = payload.get("environment", "unknown")
-        desc   = f"GitLab deployment to {env}"
+        env = payload.get("environment", "unknown")
+        desc = f"GitLab deployment to {env}"
         change_type = "deployment"
     else:
         return {"status": "skipped", "event": event}
 
     change_id = await _save_change(
-        org_id=org_id, server_id=None,
-        change_type=change_type, source="gitlab_webhook",
-        actor=actor, description=desc, payload=payload, git_sha=sha,
+        org_id=org_id,
+        server_id=None,
+        change_type=change_type,
+        source="gitlab_webhook",
+        actor=actor,
+        description=desc,
+        payload=payload,
+        git_sha=sha,
     )
     return {"change_id": change_id, "event": event}
 

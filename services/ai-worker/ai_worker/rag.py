@@ -32,7 +32,9 @@ async def retrieve_similar(
            WHERE org_id = $1::uuid AND embedding IS NOT NULL
            ORDER BY embedding <=> $2::vector
            LIMIT $3""",
-        org_id, _vec_literal(vec), top_k,
+        org_id,
+        _vec_literal(vec),
+        top_k,
     )
     return [
         {"title": r["title"], "content": r["content"], "type": r["doc_type"]}
@@ -56,5 +58,8 @@ async def store_incident(
     await pool.execute(
         """INSERT INTO rag_documents (org_id, doc_type, title, content, embedding)
            VALUES ($1::uuid, 'incident', $2, $3, $4::vector)""",
-        org_id, f"Incident {incident_id[:16]}", content, _vec_literal(vec),
+        org_id,
+        f"Incident {incident_id[:16]}",
+        content,
+        _vec_literal(vec),
     )

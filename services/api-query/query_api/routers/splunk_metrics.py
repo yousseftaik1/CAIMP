@@ -6,6 +6,7 @@ summary index based on the requested time range. Returns the same
 MetricPoint shape as the TimescaleDB metrics router so the frontend
 can use either backend transparently.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -23,23 +24,23 @@ splunk_client = None
 
 
 class MetricPoint(BaseModel):
-    time:        datetime
+    time: datetime
     metric_name: str
-    value:       float
+    value: float
 
 
 class LiveMetricPoint(BaseModel):
-    metric:      str
-    value:       float | None
+    metric: str
+    value: float | None
     age_seconds: int
 
 
 @router.get("", response_model=list[MetricPoint])
 async def query_splunk_metrics(
-    host:        str,
+    host: str,
     metric_name: str,
-    from_time:   datetime | None = Query(default=None),
-    to_time:     datetime | None = Query(default=None),
+    from_time: datetime | None = Query(default=None),
+    to_time: datetime | None = Query(default=None),
     user=Depends(get_current_user),
 ):
     """
@@ -60,13 +61,15 @@ async def query_splunk_metrics(
             detail="Splunk is not configured on this server",
         )
 
-    now    = datetime.now(tz=timezone.utc)
-    t_to   = to_time   or now
+    now = datetime.now(tz=timezone.utc)
+    t_to = to_time or now
     t_from = from_time or (now - timedelta(hours=1))
 
     cache_key_args = dict(
-        host=host, metric_name=metric_name,
-        from_time=t_from, to_time=t_to,
+        host=host,
+        metric_name=metric_name,
+        from_time=t_from,
+        to_time=t_to,
     )
     cached = await get_cached("splunk_metrics", **cache_key_args)
     if cached:
@@ -74,11 +77,12 @@ async def query_splunk_metrics(
 
     hours = (t_to - t_from).total_seconds() / 3600
     from ..splunk import select_index_and_span
+
     index, span = select_index_and_span(hours)
 
     # Splunk earliest/latest as relative or ISO strings
     earliest = t_from.strftime("%Y-%m-%dT%H:%M:%S")
-    latest   = t_to.strftime("%Y-%m-%dT%H:%M:%S")
+    latest = t_to.strftime("%Y-%m-%dT%H:%M:%S")
 
     rows = await splunk_client.query_metrics(
         metric_name=metric_name,
@@ -103,7 +107,7 @@ async def query_splunk_metrics(
 
 @router.get("/live", response_model=LiveMetricPoint)
 async def live_metric(
-    server_id:   str,
+    server_id: str,
     metric_name: str,
     user=Depends(get_current_user),
 ):
