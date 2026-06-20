@@ -58,6 +58,9 @@ jobs:
   go-build:
     name: Go Build & Vet
     runs-on: ubuntu-latest
+    env:
+      GONOSUMCHECK: github.com/jackc/pgservicefile
+      GONOSUMDB: github.com/jackc/pgservicefile
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +69,11 @@ jobs:
           go-version: '1.22'
           cache: true
           cache-dependency-path: services/telemetry-writer/go.sum
+
+      # go.mod replaces pgservicefile with /pgservicefile (same as the Dockerfile).
+      # Clone the current HEAD so go vet / go build can resolve the replacement.
+      - name: Clone pgservicefile (replace directive dependency)
+        run: git clone --depth=1 https://github.com/jackc/pgservicefile.git /pgservicefile
 
       - name: go vet — telemetry-writer
         working-directory: services/telemetry-writer
@@ -76,7 +84,7 @@ jobs:
         run: CGO_ENABLED=0 go build -o /dev/null ./cmd/main.go
 
       - name: go vet — otel-collector tenancy processor
-        working-directory: services/otel-collector
+        working-directory: services/otel-collector/processor/tenancyprocessor
         run: go vet ./...
         continue-on-error: true   # plugin may not build standalone; best-effort
 
@@ -203,33 +211,38 @@ jobs:
       - name: Install pytest + httpx
         run: pip install pytest httpx pytest-asyncio
 
+      - name: Write .env for docker compose
+        run: |
+          cat > .env <<EOF
+          POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD=${{ env.REDIS_PASSWORD }}
+          NATS_PASSWORD=${{ env.NATS_PASSWORD }}
+          JWT_SECRET=${{ env.JWT_SECRET }}
+          CA_KEY_PASSPHRASE=${{ env.CA_KEY_PASSPHRASE }}
+          GRAFANA_ADMIN_PASSWORD=${{ env.GRAFANA_ADMIN_PASSWORD }}
+          EOF
+
       - name: Start infrastructure services
         run: docker compose up -d postgres redis nats migrate nats-setup
-        env:
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          REDIS_PASSWORD:    ${{ env.REDIS_PASSWORD }}
-          NATS_PASSWORD:     ${{ env.NATS_PASSWORD }}
-          JWT_SECRET:        ${{ env.JWT_SECRET }}
-          CA_KEY_PASSPHRASE: ${{ env.CA_KEY_PASSPHRASE }}
 
       - name: Wait for infrastructure to be healthy
         run: |
           docker compose ps
-          docker compose wait migrate nats-setup || true
-          sleep 10
+          # Poll until migrate and nats-setup containers exit successfully
+          for i in $(seq 1 30); do
+            MIGRATE=$(docker compose ps --status exited migrate 2>/dev/null | grep -c migrate || true)
+            NATS_SETUP=$(docker compose ps --status exited nats-setup 2>/dev/null | grep -c nats-setup || true)
+            if [ "$MIGRATE" -ge 1 ] && [ "$NATS_SETUP" -ge 1 ]; then
+              echo "Infrastructure ready"; break
+            fi
+            echo "Waiting... ($i/30)"; sleep 5
+          done
 
       - name: Start application services
-        run: |
-          docker compose up -d admin-api query-api ws-gateway
-        env:
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          REDIS_PASSWORD:    ${{ env.REDIS_PASSWORD }}
-          NATS_PASSWORD:     ${{ env.NATS_PASSWORD }}
-          JWT_SECRET:        ${{ env.JWT_SECRET }}
-          CA_KEY_PASSPHRASE: ${{ env.CA_KEY_PASSPHRASE }}
+        run: docker compose up -d admin-api query-api ws-gateway
 
       - name: Wait for API services
-        run: sleep 20
+        run: sleep 25
 
       - name: Run smoke tests
         run: pytest tests/integration/ -v --tb=short

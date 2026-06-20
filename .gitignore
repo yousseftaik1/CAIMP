@@ -33,6 +33,9 @@ infra/otel-collector/certs/
 *.crt
 *.p12
 
+# Go replace-directive local clone (generated at build/CI time)
+pgservicefile/
+
 # LaTeX build output
 *.aux
 *.bbl
