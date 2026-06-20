@@ -181,4 +181,6 @@ class CAManager:
     def _decrypt_key(self, data: bytes) -> ec.EllipticCurvePrivateKey:
         nonce, ct = data[: self._NONCE_LEN], data[self._NONCE_LEN :]
         pem = self._aesgcm.decrypt(nonce, ct, None)
-        return serialization.load_pem_private_key(pem, password=None)
+        key = serialization.load_pem_private_key(pem, password=None)
+        assert isinstance(key, ec.EllipticCurvePrivateKey)
+        return key
